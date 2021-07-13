@@ -10,17 +10,41 @@ from .agent import Agent
 
 
 class World():
-    def __init__(self, nrows, ncols) -> None:
+    def __init__(self, nrows, ncols, agent_position=None) -> None:
         self.stack = []
         self.ncols = ncols
         self.nrows = nrows
         self.cells = [
             [CellState.EMPTY for _ in range(ncols)] for _ in range(nrows)]
-        self.agent = Agent([self.nrows // 2, self.ncols // 2], self)
+
+        if agent_position == None:
+            agent_position = [self.nrows // 2, self.ncols // 2]
+        self.agent = Agent(agent_position, self)
         self.goal = (np.random.randint(0, nrows), np.random.randint(0, ncols))
+        self.objects = []
 
     def get_state(self, row, col):
         return self.cells[row][col]
+
+    def get_goal_position(self):
+        return self.goal
+
+    def is_object_at(self, row, col):
+        return any([ob.position == [row, col] for ob in self.objects])
+
+    def get_object_at(self, row, col):
+        result = None
+        for ob in self.objects:
+            if ob.position == [row, col]:
+                result = ob
+                break
+        if result != None:
+            self.objects.remove(result)
+        return result
+
+    def set_object_at(self, row, col, ob):
+        self.objects.append(ob)
+        ob.set_position(row, col)
 
     def values(self):
         values = [[state.value for state in row] for row in self.cells]
