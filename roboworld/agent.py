@@ -5,10 +5,10 @@ import random
 
 
 class Agent():
-    def __init__(self, position, world, print_actions=True) -> None:
+    def __init__(self, position, world, agent_direction=Direction.EAST, print_actions=True) -> None:
         self.world = world
         self.position = position
-        self.headway = Direction.EAST
+        self.headway = agent_direction
         self.object = None
         self.marks = 0
         self.print_actions = print_actions
@@ -50,9 +50,14 @@ class Agent():
             raise WallInFrontException()
         self.position[0] += self.headway.value[0]
         self.position[1] += self.headway.value[1]
+        self.world.set_state(*before, CellState.EMPTY)
+        self.world.set_state(*self.position, CellState.AGENT)
+
         if self.is_carrying_object():
             self.object.set_position(self.position)
-        self.print(f'move {before} -> {self.position}')
+        self.world.push()
+        self.print(
+            f'move ({before[1]},{before[0]}) -> ({self.position[1]},{self.position[0]})')
         return self.position
 
     def is_carrying_object(self) -> bool:

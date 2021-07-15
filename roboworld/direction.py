@@ -18,3 +18,13 @@ class Direction(Enum):
             return Direction.SOUTH
         else:
             return Direction.EAST
+
+    def to_float(self):
+        if self == Direction.EAST:
+            return 0.25
+        if self == Direction.NORTH:
+            return 0.5
+        if self == Direction.WEST:
+            return 0.75
+        else:
+            return 1.0
