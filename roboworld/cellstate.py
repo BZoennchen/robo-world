@@ -5,4 +5,5 @@ class CellState(Enum):
     EMPTY = 0
     OBSTACLE = 1
     AGENT = 2
-    GOAL = 4
+    OBJECT = 4
+    GOAL = 5

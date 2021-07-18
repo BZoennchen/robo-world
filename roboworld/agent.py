@@ -1,6 +1,6 @@
 from .cellstate import CellState
 from .direction import Direction
-from .roboexception import WallInFrontException, ObjectMissingException, SpaceIsFullException, SpaceIsEmptyException, ObjectIsHereException
+from .roboexception import WallInFrontException, ObjectMissingException, SpaceIsFullException, SpaceIsEmptyException, ObjectInFrontException
 import random
 
 
@@ -13,28 +13,39 @@ class Agent():
         self.marks = 0
         self.print_actions = print_actions
 
+    def disable_print(self):
+        self.print_actions = False
+
+    def enable_print(self):
+        self.print_actions = True
+
     def print(self, fstring):
         if self.print_actions:
             print(fstring)
 
     # non-privates
-    def is_object_here(self):
-        self.world.is_object_at(*self.position)
+    def is_object_in_front(self):
+        return self.__get_state_at(self.headway) == CellState.OBJECT
 
     def take(self):
-        if not self.is_object_here():
-            raise ObjectMissingException()
         if self.object != None:
             raise SpaceIsFullException()
-        self.object = self.world.get_object_at(*self.position)
+        if self.is_wall_in_front():
+            raise WallInFrontException()
+        if not self.is_object_in_front():
+            raise ObjectMissingException()
+        self.object = self.world.get_object_at(*self.__front())
         self.print(f'takes {self.object}')
 
     def put(self):
-        if self.is_object_here():
-            raise ObjectIsHereException()
         if not self.is_carrying_object():
             raise SpaceIsEmptyException()
-        self.world.set_object_at(*self.position, self.object)
+        if self.is_wall_in_front():
+            raise WallInFrontException()
+        if self.is_object_in_front():
+            raise ObjectInFrontException()
+
+        self.world.set_object_at(*self.__front())
         self.print(f'puts {self.object}')
         self.object = None
 
@@ -48,13 +59,15 @@ class Agent():
         before = [self.position[0], self.position[1]]
         if self.is_wall_in_front():
             raise WallInFrontException()
+        if self.is_object_in_front():
+            raise ObjectInFrontException()
         self.position[0] += self.headway.value[0]
         self.position[1] += self.headway.value[1]
         self.world.set_state(*before, CellState.EMPTY)
         self.world.set_state(*self.position, CellState.AGENT)
 
-        if self.is_carrying_object():
-            self.object.set_position(self.position)
+        # if self.is_carrying_object():
+        #    self.object.set_position(self.position)
         self.world.push()
         self.print(
             f'move ({before[1]},{before[0]}) -> ({self.position[1]},{self.position[0]})')
@@ -79,6 +92,17 @@ class Agent():
     def is_at_goal(self):
         return self.position[0] == self.world.goal[0] and self.position[1] == self.world.goal[1]
 
+    def __get_state_at(self, direction) -> CellState:
+        y, x = self.position
+        if direction == Direction.WEST:
+            return self.world.get_state(y, x-1)
+        elif direction == Direction.EAST:
+            return self.world.get_state(y, x+1)
+        elif direction == Direction.NORTH:
+            return self.world.get_state(y+1, x)
+        else:
+            return self.world.get_state(y-1, x)
+
     def __is_reachable(self, direction) -> bool:
         y, x = self.position
         if direction == Direction.WEST:
@@ -89,6 +113,9 @@ class Agent():
             return y+1 < self.world.nrows and self.world.get_state(y+1, x) != CellState.OBSTACLE
         else:
             return y-1 >= 0 and self.world.get_state(y-1, x) != CellState.OBSTACLE
+
+    def __front(self):
+        return self.position[0] + self.headway.value[0], self.position[1] + self.headway.value[1]
 
     # These methods should be implemented by the students in excercises!
     def __turn(self) -> int:

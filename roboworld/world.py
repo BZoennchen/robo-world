@@ -1,14 +1,16 @@
 from enum import Enum
 import copy
-from roboworld.direction import Direction
+import numpy as np
+import random
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import animation, rc
-import numpy as np
-from .roboexception import InvalidWorldArgumentsExeception
+
+from roboworld.direction import Direction
+from .roboexception import InvalidWorldArgumentsExeception, ObjectMissingException, ObjectInFrontException
 from .cellstate import CellState
 from .agent import Agent
-import random
 
 
 class World():
@@ -18,6 +20,7 @@ class World():
         self.stack = []
         self.ncols = ncols
         self.nrows = nrows
+        self.animation_active = True
         if cells == None:
             self.cells = [
                 [CellState.EMPTY for _ in range(ncols)] for _ in range(nrows)]
@@ -41,13 +44,19 @@ class World():
 
         self.goal = goal_position
 
-        self.objects = []
+        #self.objects = []
         self.tokens = []
 
         self.cells[agent_position[0]][agent_position[1]] = CellState.AGENT
         self.cells[self.goal[0]][self.goal[1]] = CellState.AGENT
 
         self.push()
+
+    def disable_animation(self):
+        self.animation_active = False
+
+    def enable_animation(self):
+        self.animation_active = True
 
     def is_successful(self):
         return self.agent.position == self.goal
@@ -62,21 +71,21 @@ class World():
         return self.goal
 
     def is_object_at(self, row, col):
-        return any([ob.position == [row, col] for ob in self.objects])
+        return self.get_state(row, col) == CellState.OBJECT
 
     def get_object_at(self, row, col):
-        result = None
-        for ob in self.objects:
-            if ob.position == [row, col]:
-                result = ob
-                break
-        if result != None:
-            self.objects.remove(result)
-        return result
+        if self.is_object_at(row, col):
+            result = self.get_state(row, col)
+            self.set_state(row, col, CellState.EMPTY)
+            return result
+        else:
+            raise ObjectMissingException()
 
-    def set_object_at(self, row, col, ob):
-        self.objects.append(ob)
-        ob.set_position(row, col)
+    def set_object_at(self, row, col):
+        if self.is_object_at(row, col):
+            raise ObjectInFrontException()
+        else:
+            self.set_state(row, col, CellState.OBJECT)
 
     def values(self):
         values = [[state.value for state in row] for row in self.cells]
@@ -85,11 +94,12 @@ class World():
                ][self.agent.position[1]] = CellState.AGENT.value + self.agent.headway.to_float()
         return values
 
-    def get_agent(self):
+    def get_robo(self):
         return self.agent
 
     def push(self):
-        self.stack.append(self.values())
+        if self.animation_active:
+            self.stack.append(self.values())
 
     def pop(self):
         if len(self.stack) > 0:
@@ -99,11 +109,13 @@ class World():
     def get_animation(self, interval=150, save=False, dpi=80):
         if len(self.stack) <= 1:
             return
+
+        stack_copy = copy.deepcopy(self.stack)
         fig = plt.figure(figsize=(self.ncols, self.nrows), dpi=dpi)
         ax = fig.add_subplot(1, 1, 1)
         ax.grid(which='both')
         matplt = ax.matshow(
-            self.values(), interpolation='nearest', vmin=0, vmax=3)
+            stack_copy[0], interpolation='nearest', vmin=0, vmax=3)
         x_ticks = np.arange(-0.5, self.ncols+1, 1)
         y_ticks = np.arange(-0.5, self.nrows+1, 1)
         ax.set_xticks([])
@@ -114,7 +126,6 @@ class World():
         ax.set_ylim(-0.5, self.nrows-0.5)
 
         i = {'index': 0}  # trick to enforce sideeffect
-        stack_copy = copy.deepcopy(self.stack)
 
         def updatefig(*args):
             i['index'] += 1
@@ -141,7 +152,7 @@ class World():
         x_ticks = np.arange(-0.5, self.ncols+1, 1)
         y_ticks = np.arange(-0.5, self.nrows+1, 1)
         values = self.values()
-        #values = np.random.random((self.nrows, self.ncols))
+        # values = np.random.random((self.nrows, self.ncols))
         ax.grid(which='both')
         ax.matshow(values,  interpolation='nearest', vmin=0,
                    vmax=CellState.GOAL.value)  # vmin=0, vmax=5,cmap='gray',
@@ -162,12 +173,22 @@ class World():
         return None
 
     @staticmethod
-    def corridor(length=10):
-        cells = [[CellState.AGENT] +
-                 [CellState.EMPTY for _ in range(length-2)] + [CellState.GOAL]]
-        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, agent_direction=Direction.EAST)
+    def corridor(length=10, random_headway=False, nobjects=0):
 
-    @staticmethod
+        objects = [CellState.OBJECT for _ in range(min(nobjects, length-2))]
+        emptys = [CellState.EMPTY for _ in range(length-2-len(objects))]
+        combined = objects + emptys
+        random.shuffle(combined)
+
+        cells = [[CellState.AGENT] + combined + [CellState.GOAL]]
+
+        agent_direction = Direction.EAST
+        if random_headway:
+            agent_direction = random.choice(
+                [Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, agent_direction=agent_direction)
+
+    @ staticmethod
     def maze():
         text = """N#---#---#---
 -#-#-#-#-#-#-
@@ -177,7 +198,7 @@ class World():
 ---#---#---#G"""
         return World.str_to_world(text)
 
-    @staticmethod
+    @ staticmethod
     def str_to_world(text):
         cells = []
         agent_direction = Direction.EAST

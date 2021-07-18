@@ -2,13 +2,11 @@ from roboworld.world import World
 from roboworld.agent import Agent
 from roboworld.direction import Direction
 
-import random
-
 
 def threeRightAndUp():
     agent_position = [4, 4]
     world = World(nrows=10, ncols=10, agent_position=agent_position)
-    agent = world.get_agent()
+    agent = world.get_robo()
 
     agent._Agent__move_east()
     agent._Agent__move_east()
@@ -24,7 +22,7 @@ def threeRightAndUp():
 def randomWalk():
     agent_position = [4, 4]
     world = World(nrows=10, ncols=10, agent_position=agent_position)
-    agent = world.get_agent()
+    agent = world.get_robo()
 
     while not agent.is_at_goal():
         turns = random.choice([0, 1, 2, 3])
@@ -40,7 +38,7 @@ def randomWalk():
 def deterministicWalk():
     agent_position = [4, 4]
     world = World(nrows=10, ncols=10, agent_position=agent_position)
-    agent = world.get_agent()
+    agent = world.get_robo()
 
     agent._Agent__turn_to_west()
     assert agent._Agent__get_direction() == Direction.WEST

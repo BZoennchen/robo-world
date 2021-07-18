@@ -17,13 +17,13 @@ class WallInFrontException(RoboException):
 
 
 class ObjectMissingException(RoboException):
-    def __init__(self, message="There is no object that can be taken."):
+    def __init__(self, message="There is no object in front that can be taken."):
         self.message = message
         super().__init__(self.message)
 
 
-class ObjectIsHereException(RoboException):
-    def __init__(self, message="The space is occupied by an object."):
+class ObjectInFrontException(RoboException):
+    def __init__(self, message="The space in front is occupied by an object."):
         self.message = message
         super().__init__(self.message)
 
