@@ -10,6 +10,12 @@ class InvalidWorldArgumentsExeception(Exception):
         super().__init__(self.message)
 
 
+class CellOccupiedException(RoboException):
+    def __init__(self, message="There something in the way."):
+        self.message = message
+        super().__init__(self.message)
+
+
 class WallInFrontException(RoboException):
     def __init__(self, message="There is a wall in front."):
         self.message = message

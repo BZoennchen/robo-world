@@ -52,6 +52,9 @@ class Agent():
     def front_is_clear(self):
         return not self.is_wall_in_front()
 
+    def is_mark_in_front(self) -> bool:
+        return self.front_is_clear() and self.__is_mark_at(self.headway)
+
     def is_wall_in_front(self) -> bool:
         return not self.__is_reachable(self.headway)
 
@@ -72,6 +75,14 @@ class Agent():
         self.print(
             f'move ({before[1]},{before[0]}) -> ({self.position[1]},{self.position[0]})')
         return self.position
+
+    def set_mark(self):
+        self.world.set_mark_at(*self.position)
+        self.print(f'mark ({self.position[1]},{self.position[0]})')
+
+    def unset_mark(self):
+        self.world.unset_mark_at(*self.position)
+        self.print(f'remove mark ({self.position[1]},{self.position[0]})')
 
     def is_carrying_object(self) -> bool:
         return self.object != None
@@ -103,6 +114,17 @@ class Agent():
         else:
             return self.world.get_state(y-1, x)
 
+    def __is_mark_at(self, direction) -> bool:
+        y, x = self.position
+        if direction == Direction.WEST:
+            return self.world.is_mark_at(y, x-1)
+        elif direction == Direction.EAST:
+            return self.world.is_mark_at(y, x+1)
+        elif direction == Direction.NORTH:
+            return self.world.is_mark_at(y+1, x)
+        else:
+            return self.world.is_mark_at(y-1, x)
+
     def __is_reachable(self, direction) -> bool:
         y, x = self.position
         if direction == Direction.WEST:
@@ -116,6 +138,9 @@ class Agent():
 
     def __front(self):
         return self.position[0] + self.headway.value[0], self.position[1] + self.headway.value[1]
+
+    def __back(self):
+        return self.position[0] - self.headway.value[0], self.position[1] - self.headway.value[1]
 
     # These methods should be implemented by the students in excercises!
     def __turn(self) -> int:
