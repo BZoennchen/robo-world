@@ -27,5 +27,5 @@ def new_world(nrows=5, ncols=9):
     return World(nrows=nrows, ncols=ncols)
 
 
-def comlex_maze(nrows=10, ncols=10):
+def complex_maze(nrows=10, ncols=10):
     return World.complex_maze(nrows=nrows, ncols=ncols)
