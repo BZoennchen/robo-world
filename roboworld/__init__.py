@@ -24,7 +24,7 @@ def str_to_world(text):
 
 
 def new_world(nrows=5, ncols=9, agent_position=None, goal_position=None):
-    return World(nrows=nrows, ncols=ncols)
+    return World(nrows=nrows, ncols=ncols, agent_position=agent_position, goal_position=goal_position)
 
 
 def complex_maze(nrows=10, ncols=10):
