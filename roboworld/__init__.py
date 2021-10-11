@@ -1,4 +1,5 @@
-__version__ = '0.0.1'
+__version__ = '0.1.0'
+__author__ = 'Benedikt Zoennchen'
 
 from .agent import Agent
 from .world import World
