@@ -14,7 +14,7 @@ from .agent import Agent
 
 
 class World():
-    def __init__(self, nrows, ncols, cells=None, agent_direction=Direction.NORTH) -> None:
+    def __init__(self, nrows, ncols, cells=None, agent_direction=Direction.NORTH, agent_position=None, goal_position=None) -> None:
         if nrows == 0 or ncols == 0 or (cells != None and (len(cells) == 0 or len(cells[0]) == 0)):
             raise InvalidWorldArgumentsExeception()
         self.stack = []
@@ -29,8 +29,11 @@ class World():
         else:
             self.cells = cells
 
-        agent_position = self.__find_cell(CellState.AGENT)
-        goal_position = self.__find_cell(CellState.GOAL)
+        if agent_position == None:
+            agent_position = self.__find_cell(CellState.AGENT)
+
+        if goal_position == None:
+            goal_position = self.__find_cell(CellState.GOAL)
 
         if agent_position == None:
             agent_position = [self.nrows // 2, self.ncols // 2]
