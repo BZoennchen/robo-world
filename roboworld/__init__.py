@@ -27,5 +27,5 @@ def new_world(nrows=5, ncols=9, agent_position=None, goal_position=None):
     return World(nrows=nrows, ncols=ncols, agent_position=agent_position, goal_position=goal_position)
 
 
-def complex_maze(nrows=10, ncols=10):
-    return World.complex_maze(nrows=nrows, ncols=ncols)
+def complex_maze(nrows=10, ncols=10, agent_direction=None):
+    return World.complex_maze(nrows=nrows, ncols=ncols, agent_direction=agent_direction)

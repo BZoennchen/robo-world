@@ -12,9 +12,9 @@ package_data = \
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.0.1',
+    'version': '0.1.0',
     'description': 'A Python library to learn loops',
-    'author': 'BZoennchen',
+    'author': 'Benedikt Zoennchen',
     'author_email': 'benedikt.zoennchen@web.de',
     'maintainer': 'BZoennchen',
     'maintainer_email': 'benedikt.zoennchen@web.de',

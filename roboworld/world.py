@@ -221,7 +221,7 @@ class World():
         return World.str_to_world(text)
 
     @staticmethod
-    def complex_maze(nrows=10, ncols=10):
+    def complex_maze(nrows=10, ncols=10, agent_direction=None):
         cells = [[CellState.OBSTACLE for _ in range(
             ncols)] for _ in range(nrows)]
 
@@ -289,8 +289,9 @@ class World():
                     max_distance = len(stack)
                     end = next
 
-        agent_direction = random.choice(
-            [Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
+        if agent_direction == None:
+            agent_direction = random.choice(
+                [Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
 
         cells[start[0]][start[1]] = CellState.AGENT
         cells[end[0]][end[1]] = CellState.GOAL
