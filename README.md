@@ -1,6 +1,10 @@
 # robo-world
 
+## Installation
+
 ``sudo python setup.py install``
+
+## Purpose
 
 robo-world is an educational ``Python``-package designed for students to learn the basic programming contects such as
 
