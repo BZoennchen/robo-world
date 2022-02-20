@@ -14,7 +14,7 @@ setup_kwargs = {
     'name': 'roboworld',
     'version': '0.1.0',
     'description': 'A Python library to learn loops',
-    'author': 'Benedikt Zoennchen',
+    'author': 'Benedikt Zoennchenpip',
     'author_email': 'benedikt.zoennchen@web.de',
     'maintainer': 'BZoennchen',
     'maintainer_email': 'benedikt.zoennchen@web.de',
