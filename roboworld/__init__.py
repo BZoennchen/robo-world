@@ -1,13 +1,12 @@
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __author__ = 'Benedikt Zoennchen'
 
-from .agent import Agent
-from .world import World
+from .roboworld import World
 from IPython.display import HTML, display
 
 
 def animate(world):
-    anim = world.get_animation(save=True)
+    anim = world.get_animation(save=False)
     if anim != None:
         display(HTML(anim.to_jshtml()))
 

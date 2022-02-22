@@ -1,7 +1,13 @@
-from roboworld.world import World
-from roboworld.agent import Agent
-from roboworld.direction import Direction
+"""Testing roboworld
 
+This script is for testing purposes.
+
+"""
+
+from roboworld.roboworld import World
+from roboworld.roboworld import Agent
+from roboworld.direction import Direction
+import random
 
 def threeRightAndUp():
     agent_position = [4, 4]
@@ -30,9 +36,7 @@ def randomWalk():
             agent.turn_left()
         if not agent.is_wall_in_front():
             agent_position = agent.move()
-    goal_position = [world.get_goal_position()[0],
-                     world.get_goal_position()[1]]
-    assert agent_position == goal_position, f'{agent_position} != {goal_position}'
+    assert world.is_successful(), f'{agent_position} != {world.goal}'
 
 
 def deterministicWalk():
@@ -79,9 +83,7 @@ def deterministicWalk():
             agent_position = agent.move()  # move right
         agent._Agent__turn_right()
 
-    goal_position = [world.get_goal_position()[0],
-                     world.get_goal_position()[1]]
-    assert agent_position == goal_position, f'{agent_position} != {goal_position}'
+    assert world.is_successful(), f'{agent_position} != {world.goal}'
 
 
 if __name__ == "__main__":
