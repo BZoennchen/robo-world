@@ -42,10 +42,10 @@ And by doing so, they hopefully pick up the most important programming fundament
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.1.1',
+    'version': '0.1.2',
     'description': 'Educational roboter world for learning the basic programming concepts.',
     'long_description': long_description,
-    'author': 'Benedikt Zoennchenpip',
+    'author': 'Benedikt Zoennchen',
     'author_email': 'benedikt.zoennchen@web.de',
     'maintainer': 'BZoennchen',
     'maintainer_email': 'benedikt.zoennchen@web.de',

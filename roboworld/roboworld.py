@@ -1,289 +1,292 @@
-from enum import Enum
-from sre_parse import State
+# external modules
 import numpy as np
 
+# std lib
+import copy
 from typing import Sequence
 import random
+import enum
 
-from .animator import Animator
-from .direction import Direction
-from .roboexception import InvalidWorldArgumentsExeception, ObjectMissingException, ObjectInFrontException, CellOccupiedException
-from .roboexception import WallInFrontException, SpaceIsFullException, SpaceIsEmptyException
-from .cellstate import CellState
+# local modules
+from .vector import D2DVector
+from .visualization import MatplotVisualizer
 
-class World():
+class CellState(enum.IntEnum):
+    """
+    All possible states of a cell of the grid (cellular automaton).
+    WALL is immovable while STONE and LEAF is moveable.
+    Numbers are choosen to achieve a nice visualization.
+    """
+
+    EMPTY = 19
+    WALL = 16
+    LEAF = 9
+    STONE = 4
+
+    # unsed
+    GOAL = 12
+
+    # ROBO = 0,1,2,3 N,W,S,E
+    # STONE = 4
+    # LEAF = 9
+    # Empty 19
+    # WALL = 16
+
+    def __repr__(self) -> str:
+        return str(self.value)
+
+@enum.unique
+class Orientation(enum.Enum):
+    """All possible orientations of robo."""
+
+    # ccw ordered (y, x)!!!
+    EAST = D2DVector(0, 1)
+    NORTH = D2DVector(1, 0)
+    WEST = D2DVector(0, -1)
+    SOUTH = D2DVector(-1, 0)
+
+    def next(self):
+        """Rotates the current direction by 90 degrees in ccw order.
+
+        Returns:
+            Orientation: The next orientation turning the current one by 90 degrees.
+        """
+
+        if self == Orientation.EAST:
+            return Orientation.NORTH
+        if self == Orientation.NORTH:
+            return Orientation.WEST
+        if self == Orientation.WEST:
+            return Orientation.SOUTH
+        else:
+            return Orientation.EAST
+
+    def to_int(self) -> int:
+        """Transforms the direction to to a integer.
+
+        Returns:
+            int: the integer representation of this orientation
+        """
+
+        if self == Orientation.EAST:
+            return 0
+        if self == Orientation.NORTH:
+            return 1
+        if self == Orientation.WEST:
+            return 2
+        else:
+            return 3
+
+    def __repr__(self) -> str:
+        """Transforms the direction to to a string.
+
+        Returns:
+            str: the string representation of this orientation
+        """
+        if self == Orientation.NORTH:
+            return 'N'
+        elif self == Orientation.SOUTH:
+            return 'S'
+        elif self == Orientation.EAST:
+            return 'E'
+        else:
+            return 'W'
+
+StateGrid = Sequence[Sequence[CellState]]
+
+class World():    
     """
     The world the roboter is exploring.
 
     The world is the rectangular discrete grid of a cellular automaton.
-    A cell can be in one of six CellState: EMPTY (0), OBSTACLE (1, unmoveable), AGENT (2), OBJECT (3, moveable), GOAL (4), AGENT_AT_GOAL (5, AGENT+GOAL).
-
-    Attributes
-    ----------
-    cells: list
-        two dimensional list of CellState, that is, integers between 0 and 5
-    marks: list
-        tow dimensional list of bool, i.e., of marked cells
-    nrows: int
-        positve number of rows of the grid
-    ncols: int
-        positive number of columns of the grid
-    agent: Agent
-        the agent of the world
-    goal: tuple
-        (row, col) of the goal to enhance accessing the goal cell
+    A cell can be in one of three CellState: EMPTY (0), WALL (1, immoveable), STONE (3, moveable).
     """
 
-    def __init__(self, nrows, ncols, cells=None, agent_direction=Direction.NORTH, agent_position:list[int]=None, goal_position:list[int]=None) -> None:
+    def __init__(self, nrows:int, ncols:int, cells:StateGrid=None, 
+                 robo_orientation=Orientation.NORTH, 
+                 robo_initial_position:D2DVector=None, 
+                 goal_position:D2DVector=None, 
+                 nleafs:int=0) -> None:
         """
         Initializes the world in serveral ways, depending on the arguments.
+        If cells==None, each cell, will be empty, that is, walkable by the roboter.
+        If robo_positionn==None, the roboter position will be the center of the grid.
+        If goal_position==None, the goal will be placed randomly such that it is distinct from the robo position.
         
-        If cells==None, each cell, except for the agent and goal cell, will be empty.
-        If robo_positionn==None, and there is no ROBO state within the cells, the roboter position will be the center of the grid.
-        If goal_position==None, and there is no GOAL state within the cells, the goal will be placed randomly such that it is distinct from the robo position.
+        Args:
+            nrows (int): number of rows
+            ncols (int): number of cols
+            cells (StateGrid, optional): predefined grid. Defaults to None.
+            robo_orientation (Orientation, optional): initial orientation of the roboter of this world. Defaults to Orientation.NORTH.
+            robo_initial_position (D2DVector, optional): initial position of the roboter of this world. Defaults to None.
+            goal_position (D2DVector, optional): immoveable goal position. Defaults to None.
+            nleafs (int, optional): initial number of leafs of the roboter. Defaults to 0.
+
+        Raises:
+            InvalidWorldArgumentsExeception: if the predefined grid does not match with nrows and ncols or any position is outside of the grid.
         """
 
-        if nrows == 0 or ncols == 0 or (cells != None and (len(cells) == 0 or len(cells[0]) == 0)):
-            raise InvalidWorldArgumentsExeception()
-        self.stack = []
-        self.ncols = ncols
-        self.nrows = nrows
-        self.animation_active = True
+        # generate empty grid if cell is undefined
         if cells == None:
-            self.cells = [[CellState.EMPTY for _ in range(ncols)] for _ in range(nrows)]
-        elif nrows != len(cells) or ncols != len(cells[0]):
-            raise InvalidWorldArgumentsExeception()
-        else:
-            self.cells = cells
+            cells = [[CellState.EMPTY for _ in range(ncols)] for _ in range(nrows)]
+        elif len(cells) != nrows or (len(cells) < 0 or len(cells[0]) != ncols):
+            raise InvalidWorldArgumentsExeception(f'Invalid grid dimensions.') 
 
-        # determine the robo position
-        if agent_position == None:
-            agent_position = self.__find_cell(CellState.AGENT, CellState.AGENT_AT_GOAL)
-        if agent_position == None:
-            agent_position = [self.nrows // 2, self.ncols // 2]
-        self.agent = Agent(agent_position, self, agent_direction=agent_direction)
-        self.animator = Animator()
-
-        # determine the goal position
+        # determine the goal position if it is undefined
         if goal_position == None:
-            goal_position = self.__find_cell(CellState.GOAL)
-        if goal_position == None:
-            while goal_position == None or (goal_position == agent_position and (ncols > 1 or nrows > 1)):
-                goal_position = [np.random.randint(0, nrows), np.random.randint(0, ncols)]
-        self.goal = goal_position
+            while goal_position == None or (goal_position == robo_initial_position and (ncols > 1 or nrows > 1)):
+                goal_position = D2DVector(np.random.randint(0, nrows), np.random.randint(0, ncols))
 
-        self.cells[agent_position[0]][agent_position[1]] = CellState.AGENT
+        self._grid : Grid = Grid(cells, goal_position)
 
-        if agent_position == self.goal:
-            self.cells[self.goal[0]][self.goal[1]] = CellState.AGENT_AT_GOAL
-        else:
-            self.cells[self.goal[0]][self.goal[1]] = CellState.GOAL
+        # determine the robo position if it is undefined
+        if robo_initial_position == None:
+            robo_initial_position = D2DVector(nrows // 2, ncols // 2)
         
-        self.marks = [[False for _ in range(ncols)] for _ in range(nrows)]
-        self.enable_animation()
+        if self._grid._is_wall_at(*robo_initial_position):
+            raise InvalidWorldArgumentsExeception(f'Robo position {robo_initial_position} is outside of the ({self._grid.nrows} times {self._grid.ncols}) grid / world.') 
+
+        self._robo : Robo = Robo(robo_initial_position, self._grid, orientation=robo_orientation, nleafs=nleafs)
 
     def __repr__(self) -> str:
         """Returns a str-representation of the robo world."""
-        representation = ''
-        for row in range(self.nrows-1,-1,-1):
-            for state in self.cells[row]:
-                char = "-"
-                if state == CellState.AGENT or state == CellState.AGENT_AT_GOAL:
-                    if self.agent.headway == Direction.NORTH:
-                        char = 'N'
-                    elif self.agent.headway == Direction.SOUTH:
-                        char = 'S'
-                    elif self.agent.headway == Direction.EAST:
-                        char = 'E'
-                    else:
-                        char = 'W'
-                elif state == CellState.OBSTACLE:
-                    char = '#'
-                elif state == CellState.OBJECT:
-                    char = 'O'
-                elif state == CellState.GOAL:
-                    char = 'G'
-                else:
-                    char = '-'
-                representation += char
-            representation += '\n'
-        return representation.strip()
+        return self._grid.torepr(self._robo)
 
-    def get_robo(self):
-        """Returns the roboter object of this world."""
-        return self.agent
+    @property
+    def grid(self):
+        """Returns a deepcopy of the grid to avoid direct manipulation of it."""
+        return copy.deepcopy(self._grid)
+
+    @property
+    def robo(self):
+        """Returns the robo of the world."""
+        return RoboProxy(self._robo)
 
     def is_successful(self):
         """Returns true if and only if the roboter found its goal."""
-        return self.agent.position[0] == self.goal[0] and self.agent.position[1] == self.goal[1]
+        return self._robo.is_at_goal()
 
-    def show(self):
+    # visualization (matplotlib is the default)
+    def show(self, scale=0.5, visualizer = lambda robo, scale: MatplotVisualizer().show(robo, scale=scale)) -> any:
         """Returns a displayabel representation of the world."""
-        return self.animator.show(self)
+        fig = visualizer(self._robo, scale)
+        return fig
 
-    def get_animation(self, interval=150, save=False, dpi=80):
+    def animate(self, scale=0.5, animator = lambda recorder, scale: MatplotVisualizer().animate(recorder, scale=scale)) -> any:
         """
-        Returns a displayable animation of the movement of the roboter.
-        Note that this call will clear the animation stack such that the next anmiation starts with the current situation.  
+        Returns a displayable animation of the recorder that was lastely added to the roboter.
+        A recorder records the movements and actions of the robo.
+        The generated animation reflects this.
+        The Animation is defined by the animator (strategy pattern)
 
-        Parameters
-        ----------
-        interval: int
-            Delay between animation frames in milliseconds.
-        save: bool
-            If True a gif will be saved at './robo-world-animation.gif'.
-        dpi: int
-            Controls the dots per inch for the movie frames. Together with the figure's size in inches, this controls the size of the movie.
+        Args:
+            scale (float, optional): _description_. Defaults to 0.5.
+            animator (MatplotVisualizer, optional): _description_. Defaults to lambdarecorder.
+
+        Returns:
+            any: animation.FuncAnimation
         """
-        return self.animator.get_animation(interval=interval, save=save, dpi=dpi)
+        if len(self._robo.recorders) <= 0:
+            return None
+        return animator(self._robo.recorders[-1], scale)
 
+    # record the actions of the robo
+    def add_recorder(self, recorder):
+        """
+        Adds and starts a recorder such that it will be notified about the roboters actions.
+        
+        Args:
+            recorder: the recorder (observer)
+        """
+        self._robo.recorders.append(recorder)
+        recorder.resume()
+        recorder.notify(self._robo)
+        
+    def remove_recorder(self, recorder):
+        """
+        Removes and stops a recorder if it is actually registered.
+        
+        Args:
+            recorder: the recorder (observer)        
+        """
+        rec = self._robo.recorders.remove(recorder)
+        if rec != None:
+            rec.pause()
+        return rec
+
+    def remove_all_recorders(self):
+        """Removes and stops all registered recorders."""
+        for recorder in self._robo.recorders:
+            self.remove_recorder(recorder)
+
+    def pause_recordings(self):
+        """Pauses all recorders."""
+        for recorder in self._robo.recorders:
+            recorder.pause()
+
+    def resume_recordings(self):
+        """Resumes all recorders."""
+        for recorder in self._robo.recorders:
+            recorder.resume()
+
+    def clear_recordings(self):
+        """Resumes resets all recorders."""
+        for recorder in self._robo.recorders:
+            recorder.clear()
+
+    # compatibility reasons
     def disable_animation(self):
-        """
-        Disables the recording of the animation.
-        This can be very useful to speed up computation, since recording the animation costs a lot of memory.
-        """
-        self.animator.disbale()
+        """Pauses and resets all recorders."""
+        self.pause_recordings()
+        self.clear_recordings()
 
     def enable_animation(self):
-        """Enables the recording of the animation."""
-        self.animator.enable()
-        self.animator._push(self)
+        """Resumes all recorders."""
+        self.resume_recordings()
 
-    ## proteced methods
-
-    def _pop(self):
-        self.animator._pop()
-
-    def _push(self):
-        self.animator._push(self)
-
-    def _move_agent(self, fr, to):
-        """
-        Moves the agent from a cell fr to another cell to, if this is possible.
-        The agent will call this method to update the world.
-        If this fails and an exception is risen there is something fundamentally wrong!
-        """
-        fr_row, fr_col = fr
-        to_row, to_col = to
-
-        if not self._is_agent_at(fr_row, fr_col):
-            raise RuntimeError(f"There is no robo at {fr}")
-        
-        if self._is_occupied(to_row, to_col):
-            raise RuntimeError(f"The destination {to} of the robo is occupied.")
-        
-        
-        if self._get_state(fr_row, fr_col) == CellState.AGENT_AT_GOAL:
-            self._set_state(fr_row, fr_col, CellState.GOAL)
-        else:
-            self._set_state(fr_row, fr_col, CellState.EMPTY)
-        
-        if self._get_state(to_row, to_col) == CellState.GOAL:
-            self._set_state(to_row, to_col, CellState.AGENT_AT_GOAL)
-        else:
-            self._set_state(to_row, to_col, CellState.AGENT)
-
-    def _get_state(self, row, col):
-        """Returns the state of the cell at (row, col)."""
-        return self.cells[row][col]
-
-    def _set_state(self, row, col, state):
-        """Sets the state of the cell at (row, col)."""
-        self.cells[row][col] = state
-
-    def _is_agent_at(self, row, col):
-        """Returns true if and only if the agent/roboter is at (row, col)."""
-        return self._get_state(row, col) == CellState.AGENT or self._get_state(row, col) == CellState.AGENT_AT_GOAL
-
-    def _is_object_at(self, row, col):
-        """Returns true if and only if a moveable object is at (row, col)."""
-        return self._get_state(row, col) == CellState.OBJECT
-
-    def _is_obstacle_at(self, row, col):
-        """Returns true if and only if a moveable object is at (row, col)."""
-        return self._get_state(row, col) == CellState.OBSTACLE
-
-    def _is_wall_at(self, row, col):
-        """Returns true if and only if (row, col) is outside of the world."""
-        return row > self.nrows or col > self.ncols
-
-    def _is_occupied(self, row, col):
-        """Returns true if and only if (row, col) is occupied by an object, obstacle or the wall (i.e. outside of the world)."""
-        return self._is_object_at(row, col) or self._is_obstacle_at(row, col) or self._is_wall_at(row, col)
-
-    def _get_object_at(self, row, col):
-        """
-        Removes an object at (row, col) and returns it if it is there.
-        Otherwise an exception is raised.
-        """
-        if self._is_object_at(row, col):
-            result = self._get_state(row, col)
-            self._set_state(row, col, CellState.EMPTY)
-            return result
-        else:
-            raise ObjectMissingException()
-
-    def _set_object_at(self, row, col):
-        if self._is_object_at(row, col):
-            raise CellOccupiedException()
-        else:
-            self._set_state(row, col, CellState.OBJECT)
-
-    def _set_mark_at(self, row, col):
-        self.marks[row][col] = True
-
-    def _unset_mark_at(self, row, col):
-        self.marks[row][col] = False
-
-    def _is_mark_at(self, row, col):
-        return self.marks[row][col]
-    
-    ## private methods
-
-    def __find_cell(self, *states):
-        for i, col in enumerate(self.cells):
-            for j, cell in enumerate(col):
-                for state in states:
-                    if cell == state:
-                        return (i, j)
-        return None
+    def get_robo(self):
+        """Returns the robo of the world."""
+        return self.robo
 
     # static factory methods
-
     @staticmethod
-    def corridor(length:int=10, random_headway:bool=False, nobjects:int=0):
-
+    def corridor(length:int=10, random_headway:bool=False, nstones:int=0):
         """
-        Returns a corridor (1-D cellular automaton) filled with randomly placed moveable objects.
+        Returns a corridor (1-D cellular automaton) filled with randomly placed moveable stones.
         The roboter is placed right at the beginning of the corridor.
-        There can be at most length-3 objects because there can be no at the cell occupied by the roboter and the goal.
+        There can be at most length-3 stones because there can be no at the cell occupied by the roboter and the goal.
         Furthermore at least one neighboring cell of the roboter has to be empty, otherwise the roboter is stuck (impossible task).
 
-        Parameters
-        ----------
-        length: int
-            Length of the corridor.
-        random_headway: bool
-            If True the orientation of the roboter is determined randomly, otherwise it is EAST.
-        nobjects: int
-            Number of objects.
+        Args:
+            length (int, optional): length of the corridor.. Defaults to 10.
+            random_headway (bool, optional): if True the orientation of the roboter is determined randomly, otherwise it is EAST.. Defaults to False.
+            nstones (int, optional): Number of stones. Defaults to 0.
+
+        Returns:
+            World: a new world, i.e., a corridor containing stones.
         """
 
-        objects = [CellState.OBJECT for _ in range(min(nobjects, length-3))]
-        emptys = [CellState.EMPTY for _ in range(length-3-len(objects))]
-        combined = objects + emptys
+        stones = [CellState.STONE for _ in range(min(nstones, length-3))]
+        emptys = [CellState.EMPTY for _ in range(length-3-len(stones))]
+        combined = stones + emptys
         random.shuffle(combined)
 
-        cells = [[CellState.AGENT] + [CellState.EMPTY] + combined + [CellState.GOAL]]
+        cells = [[CellState.EMPTY] + [CellState.EMPTY] + combined + [CellState.EMPTY]]
 
-        agent_direction = Direction.EAST
+        robo_direction = Orientation.EAST
         if random_headway:
-            agent_direction = random.choice([Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
-        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, agent_direction=agent_direction)
+            robo_direction = random.choice([Orientation.NORTH, Orientation.SOUTH, Orientation.WEST, Orientation.EAST])
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(0,0), goal_position=D2DVector(0,length-1))
 
     @ staticmethod
     def maze():
-        """Returns a small 6 times 13 simple maze."""
+        """
+        Returns a small 6 times 13 simple maze.
+        
+        Returns:
+            World: a new world, i.e., a maze.
+        
+        """
         text = """N#---#---#---
 -#-#-#-#-#-#-
 -#-#-#-#-#-#-
@@ -294,9 +297,193 @@ class World():
         return World.str_to_world(text)
 
     @staticmethod
-    def complex_maze(nrows:int=10, ncols:int=10, agent_direction:Direction=None):
+    def simple_leaf1():
         """
-        Returns a complex, randomly generated nrows times ncols maze.
+        Returns a corridor with 3 leafs.
+        
+        Returns:
+            World: a new world, i.e., a corridor containing leafs.
+        """
+        text = """E
+L
+-
+L
+L
+-
+G"""
+        return World.str_to_world(text)
+
+    @staticmethod
+    def simple_tunnel(tunnel_length:int=4, length:int=8, goal_at_end=True):
+        """_summary_
+
+        Args:
+            tunnel_length (int, optional): length of the tunnel. Defaults to 4.
+            length (int, optional): overall length of the corridor. Defaults to 8.
+            goal_at_end (bool, optional): either the goal is palced at the start (False) or end (True) of the tunnel. Defaults to True.
+
+        Raises:
+            ValueError: if lentgth < 2.
+
+        Returns:
+            World: a new world, i.e., a corridor containing tunnel.
+        """
+        if length < 2:
+            raise ValueError('length < 2')
+
+        tunnel_length = min(tunnel_length, length)
+
+        left = random.randint(0, length-tunnel_length)
+        right = random.randint(0, length-tunnel_length-left)
+        walls = tunnel_length + left + right
+        emptyleft = random.randint(0, length-walls)
+        emptyright = length-walls-emptyleft
+        
+        top = [CellState.WALL for _ in range(left)] + [CellState.WALL for _ in range(tunnel_length)] + [CellState.EMPTY for _ in range(right)] 
+        bottom = [CellState.EMPTY for _ in range(left)] + [CellState.WALL for _ in range(tunnel_length)] + [CellState.WALL for _ in range(right)] 
+
+        top = [CellState.EMPTY for _ in range(emptyleft)] + top + [CellState.EMPTY for _ in range(emptyright)]
+        bottom = [CellState.EMPTY for _ in range(emptyleft)] + bottom + [CellState.EMPTY for _ in range(emptyright)]
+
+        center = [CellState.EMPTY for _ in range(length)]
+        goal_col = emptyleft + left
+        if random.choice([True, False]):
+            top, bottom = bottom, top
+
+        if goal_at_end:
+            goal_col += tunnel_length - 1
+        
+        cells = [top, center, bottom]
+        robo_direction = Orientation.EAST
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(1,0), goal_position=D2DVector(1,goal_col))
+
+    @staticmethod
+    def simple_slalom(lentgth:int=8, walls:int=3):
+        possibilities = list(range((lentgth-1)//2))
+        walls = min(len(possibilities), walls)
+        
+        choices = []
+        for _ in range(walls):
+            index = random.randint(0,len(possibilities)-1)
+            choices.append(possibilities[index])
+            del possibilities[index]
+
+        choices.sort()
+        center = [CellState.EMPTY for _ in range(lentgth)]
+        for i in choices:
+            center[1+i*2] = CellState.WALL
+
+        top = [CellState.EMPTY for _ in range(lentgth)]
+        bottom = [CellState.EMPTY for _ in range(lentgth)]
+        cells = [top, center, bottom]
+        robo_direction = Orientation.EAST
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(1,0), goal_position=D2DVector(1,lentgth-1))
+
+    @staticmethod
+    def multi_slalom(lentgth:int=8, gaps:int=3):
+        top = [CellState.EMPTY for _ in range(lentgth)]
+        center = [CellState.EMPTY] + [CellState.WALL for _ in range(lentgth-2)] + [CellState.EMPTY]
+        bottom = [CellState.EMPTY for _ in range(lentgth)]
+
+        possibilities = list(range(1,lentgth-2))
+        choices = []
+
+        for _ in range(gaps):
+            index = random.randint(0,len(possibilities)-1)
+            choices.append(possibilities[index])
+            del possibilities[index]
+
+        for i in choices:
+            center[i] = CellState.EMPTY
+
+        cells = [top, center, bottom]
+        robo_direction = Orientation.EAST
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(1,0), goal_position=D2DVector(1,lentgth-1))
+
+    @staticmethod
+    def round_trip():
+        """Returns a non-randomized round trip world."""
+        text = """###########################
+#GE--###-------####-------#
+#-##-----#####---L--#####-#
+#-#######################-#
+#-#######################-#
+#-#######################-#
+#-#######################-#
+#-##########-------######-#
+#-#---######-#####-------L#
+#-L-#---L----##############
+###########################"""
+        return World.str_to_world(text)
+
+    @staticmethod
+    def pacman():
+        """Returns a non-randomized world where the idea is that the robo follows the leafs."""
+        text = """---------------------------
+-ELLLLL--------------------
+------L--------------------
+------LLLLLLLLLLLLLLLLLLLL-
+-------------------------L-
+-LLLLLLLLLLLLLLLLLLLLLL--L-
+-L--------------------L--L-
+-L---GLLLLLLLLLLLLLLLLL--L-
+-L-----------------------L-
+-LLLLLLLLLLLLLLLLLLLLLLLLL-
+---------------------------"""
+        return World.str_to_world(text)
+
+    @staticmethod
+    def sorting(n:int=8):
+        """Returns a non-randomized world where the idea is that robo inverts the leafs / empty cells."""
+        cells = [[CellState.LEAF for _ in range(random.randint(1,n))] for _ in range(n)]
+        for row in cells:
+            row += [CellState.EMPTY for _ in range(1+n-len(row))]
+        #random.shuffle(cells)
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=Orientation.WEST, robo_initial_position=D2DVector(0,n), goal_position=D2DVector(n-1,n))
+
+    @staticmethod
+    def game_of_life1():
+        """Returns a non-randomized world where the idea is that robo plays the game of life."""
+        text = """E---------
+---L------
+--LL------
+-LLLL-----
+LLLLLL----
+LLLLLLL---
+-LLLLL----
+--LLL-----
+---L-----G"""
+        return World.str_to_world(text)
+
+    @staticmethod
+    def invert():
+        """Returns a non-randomized world where the idea is that robo inverts the leafs / empty cells."""
+        text = """LL-----LL
+LLL---LLL
+-LLL-LLL-
+--LLLLL--
+---LLL---
+--LLLLL--
+-LLL-LLL-
+LLL---LLL
+LLG---ELL"""
+        return World.str_to_world(text)
+
+    def hole_maze(nrows:int=11, ncols:int=10):
+        cells = [[CellState.EMPTY if row%2==0 else CellState.WALL for _ in range(ncols)] for row in range(nrows)]
+        gloal_position = None
+        for row in range(nrows):
+            hole_index = random.randint(0, ncols-1)
+            cells[row][hole_index] = CellState.EMPTY
+
+            if row == nrows-1:
+                gloal_position = D2DVector(row, hole_index)
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=Orientation.EAST, robo_initial_position=D2DVector(0,0), goal_position=gloal_position)
+
+    @staticmethod
+    def complex_maze(nrows:int=10, ncols:int=10, robo_direction:Orientation=None):
+        """
+        Returns a complex, randomly generated (nrows times ncols) maze.
         It is guaranteed that there is a path from the roboter to its goal.
         
         Parameters
@@ -306,13 +493,15 @@ class World():
         ncols: int
             Number of columns of the maze.
         nobjects: int
-            agent_direction
+            robo_direction
             The orientation of the roboter (EAST, NORTH, WEST, SOUTH).
-            If the parameter is agent_direction==None, the orientation is picked randomly.
+            If the parameter is robo_direction==None, the orientation is picked randomly.
             The roboter's position is randomly determined.
         """
+        if nrows + ncols < 2:
+            raise ValueError('nrows + ncols < 2')
 
-        cells = [[CellState.OBSTACLE for _ in range(ncols)] for _ in range(nrows)]
+        cells = [[CellState.WALL for _ in range(ncols)] for _ in range(nrows)]
 
         visited = [[False for _ in range(ncols)] for _ in range(nrows)]
 
@@ -359,7 +548,7 @@ class World():
                 for test_pos in test_positions:
                     if all(map(lambda e: contains(e) and cells[e[0]][e[1]] == CellState.EMPTY, test_pos)):
                         visited[nh[0]][nh[1]] = True
-                        cells[nh[0]][nh[1]] = CellState.OBSTACLE
+                        cells[nh[0]][nh[1]] = CellState.WALL
                         break
 
         stack.append(start)
@@ -377,61 +566,238 @@ class World():
                     max_distance = len(stack)
                     end = next
 
-        if agent_direction == None:
-            agent_direction = random.choice([Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
+        if robo_direction == None:
+            robo_direction = random.choice([Orientation.NORTH, Orientation.SOUTH, Orientation.WEST, Orientation.EAST])
 
-        cells[start[0]][start[1]] = CellState.AGENT
-        cells[end[0]][end[1]] = CellState.GOAL
+        cells[start[0]][start[1]] = CellState.EMPTY
+        cells[end[0]][end[1]] = CellState.EMPTY
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(start[0], start[1]), goal_position=D2DVector(end[0], end[1]))
 
-        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, agent_direction=agent_direction)
-
-    @ staticmethod
-    def str_to_world(text: str):
+    @staticmethod
+    def str_to_world(text: str, nleafs=0):
         """
         Retunrs a world by parsing a string that represents the world.
         Single characters have the following semantic:
 
-        # -> (immovable) Obstacle
+        # -> (immovable) WALL
         G -> Goal
         N -> Roboter (headway==NORTH)
         S -> Roboter (headway==SOUTH)
         W -> Roboter (headway==WEST)
         E -> Roboter (headway==EAST)
         R -> Roboter (random headway)
-        O -> Object
-        everything else -> Empty
+        O -> STONE
+        L -> LEAF
+        everything else -> EMPTY
         """
 
         cells = []
-        agent_direction = Direction.EAST
+        robo_direction = Orientation.EAST
+        robo_position = None
+        goal_position = None
         for row, line in enumerate(text.splitlines()):
             cells.append([])
-            for c in line:
+            for col, c in enumerate(line):
                 if c in ['N', 'S', 'E', 'W', 'R']:
-                    state = CellState.AGENT
+                    state = CellState.EMPTY
+                    robo_position = D2DVector(row, col)
                     if c == 'N':
-                        agent_direction = Direction.NORTH
+                        robo_direction = Orientation.NORTH
                     elif c == 'S':
-                        agent_direction = Direction.SOUTH
+                        robo_direction = Orientation.SOUTH
                     elif c == 'W':
-                        agent_direction = Direction.WEST
+                        robo_direction = Orientation.WEST
                     elif c == 'E':
-                        agent_direction = Direction.EAST
+                        robo_direction = Orientation.EAST
                     else:
-                        agent_direction = random.choice(
-                            [Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST])
+                        robo_direction = random.choice(
+                            [Orientation.NORTH, Orientation.SOUTH, Orientation.WEST, Orientation.EAST])
                 elif c == '#':
-                    state = CellState.OBSTACLE
+                    state = CellState.WALL
                 elif c == 'G':
-                    state = CellState.GOAL
+                    state = CellState.EMPTY
+                    goal_position = D2DVector(row, col)
                 elif c == 'O':
-                    state = CellState.OBJECT
+                    state = CellState.STONE
+                elif c == 'L':
+                    state = CellState.LEAF
                 else:
                     state = CellState.EMPTY
                 cells[row].append(state)
-        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, agent_direction=agent_direction)
+        return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=robo_position, goal_position=goal_position, nleafs=nleafs)
 
-class Agent():
+class Grid():
+    """
+    The world the roboter is exploring.
+
+    The world is the rectangular discrete grid of a cellular automaton.
+    A cell can be in one of six CellState: EMPTY (0), WALL (1, unmoveable), ROBO (2), STONE (3, moveable), GOAL (4), ROBO_AT_GOAL (5, ROBO & GOAL).
+
+    Attributes
+    ----------
+    cells: list
+        two dimensional list of CellState, that is, integers between 0 and 5
+    marks: list
+        tow dimensional list of bool, i.e., of marked cells
+    nrows: int
+        positve number of rows of the grid
+    ncols: int
+        positive number of columns of the grid
+    """
+
+    def __init__(self, cells:StateGrid, goal_position:D2DVector) -> None:
+        """
+        Initializes the (perceivable) grid of the robo world.
+
+        Par
+        """
+
+        if len(cells) == 0 or len(cells[0]) == 0:
+            raise InvalidWorldArgumentsExeception(f'Invalid grid dimensions.')
+        
+        self.ncols : int = len(cells[0])
+        self.nrows : int = len(cells)
+        self.cells : StateGrid = cells
+
+        if self._is_wall_at(goal_position[0], goal_position[1]):
+            raise InvalidWorldArgumentsExeception(f'Goal at {goal_position} is outside of the world of dimension {self.nrows} times {self.ncols}.')
+
+        self.goal_position : D2DVector = goal_position
+        self.marks = [[False for _ in range(self.ncols)] for _ in range(self.nrows)]
+
+    def __repr__(self) -> str:
+        """Returns a str-representation of the robo world."""
+        return self.torepr()
+
+    def torepr(self, robo=None) -> str:
+        """Returns a str-representation of the grid including the robo."""
+        representation = ''
+        for row in range(self.nrows-1,-1,-1):
+            for col in range(self.cells[row]):
+                state = self.cells[row][col]
+                char = "-"
+                if robo != None and robo._is_at(row, col):
+                    char = robo._tochar()
+                elif state == CellState.WALL:
+                    char = '#'
+                elif state == CellState.STONE:
+                    char = 'O'
+                elif state == CellState.GOAL:
+                    char = 'G'
+                else:
+                    char = '-'
+                representation += char
+            representation += '\n'
+        return representation.strip()
+
+    ## proteced methods
+
+    def _get_state(self, row: int, col: int) -> CellState:
+        """Returns the state of the cell at (row, col)."""
+        return self.cells[row][col]
+
+    def _set_state(self, row: int, col: int, state: CellState):
+        """Sets the state of the cell at (row, col)."""
+        self.cells[row][col] = state
+
+    #def _is_robo_at(self, row, col):
+    #    """Returns true if and only if the roboter is at (row, col)."""
+    #    return self._get_state(row, col) == CellState.ROBO or self._get_state(row, col) == CellState.ROBO_AT_GOAL
+
+    def _is_stone_at(self, row: int, col: int):
+        """Returns true if and only if a moveable object is at (row, col)."""
+        return self._get_state(row, col) == CellState.STONE
+
+    def _is_leaf_at(self, row: int, col: int):
+        """Returns true if and only if a moveable LEAF is at (row, col)."""
+        return self._get_state(row, col) == CellState.LEAF
+
+    def _is_wall_at(self, row: int, col: int):
+        """Returns true if and only if (row, col) is outside of the world."""
+        return row >= self.nrows or col >= self.ncols or self._get_state(row, col) == CellState.WALL
+
+    def _is_goal_at(self, row: int, col: int):
+        """Returns true if and only if (row, col) is at the goal of the world."""
+        return self.goal_position[0] == row and self.goal_position[1] == col
+
+    def _is_impassable(self, row: int, col: int):
+        """Returns true if and only if (row, col) is occupied by a stone, obstacle or the wall (i.e. outside of the world)."""
+        return self._is_stone_at(row, col) or self._is_wall_at(row, col)
+
+    def _is_occupied(self, row: int, col: int) -> bool:
+        """Returns true if and only if (row, col) is occupied by a leaf, stone, obstacle or the wall (i.e. outside of the world)."""
+        return self._is_impassable(row, col) or self._is_leaf_at(row, col)
+
+    def _remove_stone_at(self, row: int, col: int) -> CellState:
+        """
+        Removes a stone at (row, col) and returns it if it is there.
+        Otherwise an exception is raised.
+        """
+        if self._is_stone_at(row, col):
+            result = self._get_state(row, col)
+            self._set_state(row, col, CellState.EMPTY)
+            return result
+        else:
+            raise StoneMissingException()
+
+    def _set_stone_at(self, row: int, col: int):
+        if self._is_occupied(row, col):
+            raise CellOccupiedException()
+        else:
+            self._set_state(row, col, CellState.LEAF)
+
+    def _set_stone_at(self, row: int, col: int):
+        if self._is_occupied(row, col):
+            raise CellOccupiedException()
+        else:
+            self._set_state(row, col, CellState.STONE)
+
+    def _set_leaf_at(self, row: int, col: int):
+        if self._is_occupied(row, col):
+            raise CellOccupiedException()
+        else:
+            self._set_state(row, col, CellState.LEAF)
+
+    def _set_mark_at(self, row: int, col: int):
+        self.marks[row][col] = True
+
+    def _remove_leaf_at(self, row: int, col: int) -> CellState:
+        """Removes a leaf from the position (row, col) and returns CellState.LEAF.
+
+        Args:
+            row (int): row
+            col (int): column
+
+        Raises:
+            LeafMissingException: If there is no leaf at row `row` and column `col`
+
+        Returns:
+            CellState: CellState.LEAF
+        """
+        if self._is_leaf_at(row, col):
+            result = self._get_state(row, col)
+            self._set_state(row, col, CellState.EMPTY)
+            return result
+        else:
+            raise LeafMissingException()
+
+    def _unset_mark_at(self, row: int, col: int):
+        self.marks[row][col] = False
+
+    def _is_mark_at(self, row: int, col: int):
+        return self.marks[row][col]
+    
+    ## private methods
+
+    def __find_cell(self, *states):
+        for i, col in enumerate(self.cells):
+            for j, cell in enumerate(col):
+                for state in states:
+                    if cell == state:
+                        return (i, j)
+        return None
+
+class Robo():
     """
     A representation of the roboter of the robo world.
 
@@ -441,15 +807,15 @@ class Agent():
     It can only analyse the cell directly in front, therefore, it has an orientation (headway).
     It can mark and unmark cells it occupies but can only spot marks in front.
 
-    Attributes
+    Attributes (private)
     ----------
     world: World
         The world of this roboter
     position: list
         The current row and column of the roboter
-    headway:
-        The current the headway of the roboter (EAST, WEST, NORTH or SOUTH)
-    object:
+    orientation:
+        The current orientation of the headway of the roboter (EAST, WEST, NORTH or SOUTH)
+    stone:
         The current object the roboter is carrying (if any)
     marks: int
         Number of marks the roboter has set and not unset
@@ -457,17 +823,23 @@ class Agent():
         If print roboter actions if and only if print_actions==True
     """
 
-    def __init__(self, position: Sequence[int], world: World, agent_direction: Direction=Direction.EAST, print_actions: bool=True) -> None:
-        self.world = world
-        self.position = [position[0], position[1]]
-        self.headway = agent_direction
-        self.object = None
-        self.marks = 0
-        self.print_actions = print_actions
+    def __init__(self, position:D2DVector, grid: Grid, orientation: Orientation=Orientation.EAST, print_actions: bool=True, nleafs: int = 0) -> None:
+        self.grid : Grid = grid
+        self.position : D2DVector = position
+        self.orientation : Orientation = orientation
+        self.stone : CellState = None
+        self.nmarks : int = 0
+        self.nleafs : int = nleafs
+        self.print_actions : bool = print_actions
+        self.recorders = []
 
     def __repr__(self) -> str:
-        """Returns a str-representation of the agent."""
-        return f'robo at {self.position} headway is oriented {self.headway}.'
+        """Returns a str-representation of the roboter."""
+        return f'robo at {self.position} headway is oriented {self.orientation}.'
+
+    def notify_recorders(self):
+        for recorder in self.recorders:
+            recorder.notify(self)
 
     def disable_print(self):
         """Deactivates the printing."""
@@ -478,11 +850,11 @@ class Agent():
         self.print_actions = True
 
     # non-privates
-    def is_object_in_front(self) -> bool:
+    def is_stone_in_front(self) -> bool:
         """Returns True if and only if there is an object in front of robo."""
-        return self.__get_state_at(self.headway) == CellState.OBJECT
+        return self.__get_state_at(self.orientation) == CellState.STONE
 
-    def take(self) -> None:
+    def take_stone_in_front(self) -> None:
         """
         Takes an object.
         
@@ -495,53 +867,89 @@ class Agent():
         ObjectMissingException
             If there is no object in front
         """
-        if self.object != None:
+        if self.stone != None:
             raise SpaceIsFullException()
         if self.is_wall_in_front():
             raise WallInFrontException()
-        if not self.is_object_in_front():
-            raise ObjectMissingException()
-        self.object = self.world._get_object_at(*self.__front())
-        self.__print(f'takes {self.object}')
+        if not self.is_stone_in_front():
+            raise StoneMissingException()
+        self.stone = self.grid._remove_stone_at(*self.__front())
+        self.__print(f'takes {self.stone}')
+        self.notify_recorders()
 
-    def put(self) -> None:
+    def put_stone_in_front(self) -> None:
         """
-        Puts the carrying object down in front.
+        Puts the carrying stone down in front.
         
         Raises
         ------
         SpaceIsEmptyException
-            If robo does not carry an object
+            If robo does not carry a stone
         WallInFrontException
             If there is a wall in front, i.e., no object
-        ObjectInFrontException
-            If there is another object in front
+        StoneInFrontException
+            If there is another stone in front
+        LeafInFrontException
+            If there is a leaf in front the robo can not put the stone down
         """
-
-        if not self.is_carrying_object():
+        if not self.is_carrying_stone():
             raise SpaceIsEmptyException()
         if self.is_wall_in_front():
             raise WallInFrontException()
-        if self.is_object_in_front():
-            raise ObjectInFrontException()
+        if self.is_stone_in_front():
+            raise StoneInFrontException()
+        if self.is_leaf_in_front():
+            raise LeafInFrontException()
 
-        self.world._set_object_at(*self.__front())
-        self.__print(f'puts {self.object}')
-        self.object = None
+        self.grid._set_stone_at(*self.__front())
+        self.__print(f'puts {self.stone}')
+        self.stone = None
+        self.notify_recorders()
 
-    def front_is_clear(self) -> bool:
+    def put_leaf(self) -> None:
+        """
+        Puts a leaf down at the current position.
+        
+        Raises
+        ------
+        NoMoreLeafsException
+            If robo does not carry any more leafs
+        """
+        if not self.is_carrying_leafs():
+            raise NoMoreLeafsException()
+
+        self.grid._set_leaf_at(*self.position)
+        self.__print(f'puts leaf at {self.position}')
+        self.nleafs -= 1
+        self.notify_recorders()
+        
+    def take_leaf(self) -> None:
+        self.grid._remove_leaf_at(*self.position)
+        self.__print(f'takes leaf at {self.position}')
+        self.nleafs += 1
+        self.notify_recorders()
+
+    def is_carrying_leafs(self):
+        """Returns True if and only if thre the robo carries any leafs."""
+        return self.nleafs > 0
+
+    def is_front_clear(self) -> bool:
         """Returns True if and only if thre is no wall in front, i.e., no (immoveable) obstacle and not the boundary of the world."""
         return not self.is_wall_in_front()
 
+    def is_leaf_in_front(self) -> bool:
+        """Returns True if and only if there is a LEAF in front."""
+        return self.__get_state_at(self.orientation) == CellState.LEAF
+
     def is_mark_in_front(self) -> bool:
         """Returns True if and only if there is a mark in front."""
-        return self.front_is_clear() and self.__is_mark_at(self.headway)
+        return self.is_front_clear() and self.__is_mark_at(self.orientation)
 
     def is_wall_in_front(self) -> bool:
         """Returns True if and only if there is an (immoveable) obstacle or the boundary of the world in front."""
-        return not self.__is_reachable(self.headway)
+        return not self.__is_reachable(self.orientation)
 
-    def move(self) -> list[int]:
+    def move(self) -> D2DVector:
         """
         Moves robo one cell ahead.
         
@@ -552,97 +960,107 @@ class Agent():
         ObjectInFrontException
             If there is an object (moveable) in front
         """
-        before = [self.position[0], self.position[1]]
+        before = self.position
         if self.is_wall_in_front():
             raise WallInFrontException()
-        if self.is_object_in_front():
-            raise ObjectInFrontException()
-        self.position[0] += self.headway.value[0]
-        self.position[1] += self.headway.value[1]
-        self.world._move_agent(before, self.position)
+        if self.is_stone_in_front():
+            raise StoneInFrontException()
+        self.position += self.orientation.value
+        #self._world._move_robo(before, self._position)
 
-        # if self.is_carrying_object():
-        #    self.object.set_position(self.position)
-        self.world._push()
+        #self._world._push()
         self.__print(f'move ({before[1]},{before[0]}) -> ({self.position[1]},{self.position[0]})')
+        self.notify_recorders()
         return self.position
 
     def set_mark(self) -> None:
         """Marks the current cell, i.e., position."""
-        self.world._set_mark_at(*self.position)
+        self.grid._set_mark_at(*self.position)
         self.__print(f'mark ({self.position[1]},{self.position[0]})')
+        self.notify_recorders()
 
     def unset_mark(self) -> None:
         """Unmarks the current cell, i.e., position."""
-        self.world._unset_mark_at(*self.position)
+        self.grid._unset_mark_at(self.position[0], self.position[1])
         self.__print(f'remove mark ({self.position[1]},{self.position[0]})')
+        self.notify_recorders()
 
-    def is_carrying_object(self) -> bool:
+    def is_carrying_stone(self) -> bool:
         """Returns True if and only if robo is carrying an object."""
-        return self.object != None
+        return self.stone != None
 
     def turn_left(self) -> None:
         """Robo turns 90 degrees to the left."""
-        before = self.headway
-        self.headway = self.headway.next()
-        self.__print(f'turn {before} -> {self.headway}')
+        before = self.orientation
+        self.orientation = self.orientation.next()
+        self.__print(f'turn {before} -> {self.orientation}')
+        self.notify_recorders()
 
     def is_facing_north(self) -> bool:
         """Returns True if and only if robo is oriented towords the north."""
-        return self.headway == Direction.NORTH
+        return self.orientation == Orientation.NORTH
 
-    def toss(self):
+    def toss(self) -> bool:
+        """Returns randomly True or False."""
         toss = random.randint(0, 1) == 1
         self.__print(f'toss {toss}')
         return toss
 
     def is_at_goal(self):
         """Returns True if and only if robo is standing at the goal."""
-        return self.position[0] == self.world.goal[0] and self.position[1] == self.world.goal[1]
+        return self.grid._is_goal_at(self.position[0], self.position[1])
+
+    ## protected methods
+    def _char(self):
+        return str(self.orientation)
+
+    def _is_at(self, row, col):
+        """Returns true if and only if the roboter is at (row, col)."""
+        return self.position[0] == row and self.position[1] == col
 
     ## private methods
     def __print(self, fstring: str):
         if self.print_actions:
             print(fstring)
 
-    def __get_state_at(self, direction: Direction) -> CellState:
+    def __get_state_at(self, direction: Orientation) -> CellState:
         y, x = self.position
-        if direction == Direction.WEST:
-            return self.world._get_state(y, x-1)
-        elif direction == Direction.EAST:
-            return self.world._get_state(y, x+1)
-        elif direction == Direction.NORTH:
-            return self.world._get_state(y+1, x)
+        if direction == Orientation.WEST:
+            return self.grid._get_state(y, x-1)
+        elif direction == Orientation.EAST:
+            return self.grid._get_state(y, x+1)
+        elif direction == Orientation.NORTH:
+            return self.grid._get_state(y+1, x)
         else:
-            return self.world._get_state(y-1, x)
+            return self.grid._get_state(y-1, x)
 
-    def __is_mark_at(self, direction: Direction) -> bool:
+    def __is_mark_at(self, direction: Orientation) -> bool:
         y, x = self.position
-        if direction == Direction.WEST:
-            return self.world._is_mark_at(y, x-1)
-        elif direction == Direction.EAST:
-            return self.world._is_mark_at(y, x+1)
-        elif direction == Direction.NORTH:
-            return self.world._is_mark_at(y+1, x)
+        if direction == Orientation.WEST:
+            return self.grid._is_mark_at(y, x-1)
+        elif direction == Orientation.EAST:
+            return self.grid._is_mark_at(y, x+1)
+        elif direction == Orientation.NORTH:
+            return self.grid._is_mark_at(y+1, x)
         else:
-            return self.world._is_mark_at(y-1, x)
+            return self.grid._is_mark_at(y-1, x)
 
-    def __is_reachable(self, direction: Direction) -> bool:
+    def __is_reachable(self, direction: Orientation) -> bool:
         y, x = self.position
-        if direction == Direction.WEST:
-            return x-1 >= 0 and self.world._get_state(y, x-1) != CellState.OBSTACLE
-        elif direction == Direction.EAST:
-            return x+1 < self.world.ncols and self.world._get_state(y, x+1) != CellState.OBSTACLE
-        elif direction == Direction.NORTH:
-            return y+1 < self.world.nrows and self.world._get_state(y+1, x) != CellState.OBSTACLE
+        if direction == Orientation.WEST:
+            return x-1 >= 0 and self.grid._get_state(y, x-1) != CellState.WALL
+        elif direction == Orientation.EAST:
+            return x+1 < self.grid.ncols and self.grid._get_state(y, x+1) != CellState.WALL
+        elif direction == Orientation.NORTH:
+            return y+1 < self.grid.nrows and self.grid._get_state(y+1, x) != CellState.WALL
         else:
-            return y-1 >= 0 and self.world._get_state(y-1, x) != CellState.OBSTACLE
+            return y-1 >= 0 and self.grid._get_state(y-1, x) != CellState.WALL
 
     def __front(self) -> tuple[int, int]:
-        return self.position[0] + self.headway.value[0], self.position[1] + self.headway.value[1]
+        return self.position + self.orientation.value
 
     def __back(self):
-        return self.position[0] - self.headway.value[0], self.position[1] - self.headway.value[1]
+        return self.position - self.orientation.value
 
     # These methods should be implemented by the students in excercises!
     def __turn(self) -> int:
@@ -682,12 +1100,12 @@ class Agent():
         for _ in range(4 - (turns % 4)):
             self.turn_left()
 
-    def __is_wall_at(self, direction: Direction) -> bool:
-        if direction == Direction.NORTH:
+    def __is_wall_at(self, direction: Orientation) -> bool:
+        if direction == Orientation.NORTH:
             turns = self.__turn_to_north()
-        elif direction == Direction.EAST:
+        elif direction == Orientation.EAST:
             turns = self.__turn_to_east()
-        elif direction == Direction.SOUTH:
+        elif direction == Orientation.SOUTH:
             turns = self.__turn_to_south()
         else:
             turns = self.__turn_to_west()
@@ -696,16 +1114,16 @@ class Agent():
         return result
 
     def __is_wall_at_west(self) -> bool:
-        return self.__is_wall_at(Direction.WEST)
+        return self.__is_wall_at(Orientation.WEST)
 
     def __is_wall_at_east(self) -> bool:
-        return self.__is_wall_at(Direction.EAST)
+        return self.__is_wall_at(Orientation.EAST)
 
     def __is_wall_at_north(self) -> bool:
-        return self.__is_wall_at(Direction.NORTH)
+        return self.__is_wall_at(Orientation.NORTH)
 
     def __is_wall_at_south(self) -> bool:
-        return self.__is_wall_at(Direction.SOUTH)
+        return self.__is_wall_at(Orientation.SOUTH)
 
     def __move_west(self):
         self.__turn_to_west()
@@ -725,4 +1143,186 @@ class Agent():
 
     # methods for testing
     def __get_direction(self):
-        return self.headway
+        return self.orientation
+
+class RoboProxy:
+    def __init__(self, robo: Robo):
+        self._robo = robo
+
+    def __repr__(self) -> str:
+        """Returns a str-representation of the roboter."""
+        return self._robo.__repr__()
+
+    def disable_print(self) -> None:
+        """Deactivates the printing."""
+        self._robo.print_actions = False
+
+    def enable_print(self) -> None:
+        """Activates the printing."""
+        self._robo.print_actions = True
+
+    # methods that can be used by the learners
+    def take_stone_in_front(self) -> None:
+        """
+        Takes an object.
+        
+        Raises
+        ------
+        SpaceIsFullException
+            If robo already carries an object
+        WallInFrontException
+            If there is a wall in front, i.e., no object
+        ObjectMissingException
+            If there is no object in front
+        """
+        self._robo.take_stone_in_front()
+
+    def put_stone_in_front(self) -> None:
+        """
+        Puts the carrying object down in front.
+        
+        Raises
+        ------
+        SpaceIsEmptyException
+            If robo does not carry an object
+        WallInFrontException
+            If there is a wall in front, i.e., no object
+        ObjectInFrontException
+            If there is another object in front
+        """
+        self._robo.put_stone_in_front()
+
+    def is_leaf_in_front(self) -> bool:
+        """Returns True if and only if thre is a leaf in front."""
+        return self._robo.is_leaf_in_front()
+
+    def is_front_clear(self) -> bool:
+        """Returns True if and only if thre is no wall in front, i.e., no (immoveable) obstacle and not the boundary of the world."""
+        return self._robo.is_front_clear()
+
+    def is_mark_in_front(self) -> bool:
+        """Returns True if and only if there is a mark in front."""
+        return self._robo.is_mark_in_front()
+
+    def is_wall_in_front(self) -> bool:
+        """Returns True if and only if there is an (immoveable) obstacle or the boundary of the world in front."""
+        return self._robo.is_wall_in_front()
+
+    def is_stone_in_front(self) -> bool:
+        """Returns True if and only if there is an object in front of robo."""
+        return self._robo.is_stone_in_front()
+
+    def is_carrying_leafs(self) -> bool:
+        """Returns True if and only if thre the robo carries any leafs."""
+        return self._robo.is_carrying_leafs()
+
+    def put_leaf(self) -> None:
+        self._robo.put_leaf()
+        
+    def take_leaf(self) -> None:
+        self._robo.take_leaf()
+
+    def move(self) -> D2DVector:
+        """
+        Moves robo one cell ahead.
+        
+        Raises
+        ------
+        WallInFrontException
+            If there is an (immoveable) wall in front (obstacle or boundary of the world)
+        ObjectInFrontException
+            If there is an object (moveable) in front
+        """
+        return self._robo.move()
+    
+    @property
+    def position(self) -> D2DVector:
+        return self._robo.position
+
+    def set_mark(self) -> None:
+        """Marks the current cell, i.e., position."""
+        self._robo.set_mark()
+
+    def unset_mark(self) -> None:
+        """Unmarks the current cell, i.e., position."""
+        self._robo.unset_mark()
+
+    def is_carrying_stone(self) -> bool:
+        """Returns True if and only if robo is carrying an object."""
+        return self._robo.is_carrying_stone()
+
+    def turn_left(self) -> None:
+        """Robo turns 90 degrees to the left."""
+        self._robo.turn_left()
+
+    def is_facing_north(self) -> bool:
+        """Returns True if and only if robo is oriented towords the north."""
+        return self._robo.is_facing_north()
+
+    def toss(self) -> bool:
+        """Returns randomly True or False."""
+        return self._robo.toss()
+
+    def is_at_goal(self) -> bool:
+        """Returns True if and only if robo is standing at the goal."""
+        return self._robo.is_at_goal()
+    
+class RoboException(Exception):
+    def __init__(self, message=""):
+        self.message = message
+        super().__init__(self.message)
+
+
+class InvalidWorldArgumentsExeception(Exception):
+    def __init__(self, message="Invalid world arguments."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class CellOccupiedException(RoboException):
+    def __init__(self, message="There something in the way."):
+        self.message = message
+        super().__init__(self.message)
+
+class WallInFrontException(RoboException):
+    def __init__(self, message="There is a wall in front."):
+        self.message = message
+        super().__init__(self.message)
+
+class LeafInFrontException(RoboException):
+    def __init__(self, message="There is a leaf in front."):
+        self.message = message
+        super().__init__(self.message)
+
+class LeafMissingException(RoboException):
+    def __init__(self, message="There is no leaf at the current position."):
+        self.message = message
+        super().__init__(self.message)
+
+class NoMoreLeafsException(RoboException):
+    def __init__(self, message="Robo does not carry any more leafs."):
+        self.message = message
+        super().__init__(self.message)
+
+class StoneMissingException(RoboException):
+    def __init__(self, message="There is no object in front that can be taken."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class StoneInFrontException(RoboException):
+    def __init__(self, message="The space in front is occupied by an object."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class SpaceIsFullException(RoboException):
+    def __init__(self, message="The space is occupied by something."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class SpaceIsEmptyException(RoboException):
+    def __init__(self, message="There is nothing to pick up."):
+        self.message = message
+        super().__init__(self.message)
