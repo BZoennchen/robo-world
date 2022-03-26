@@ -16,7 +16,7 @@ keywords = ['education', 'cellular automaton', 'roboter', 'learning', 'beginners
 #long_description_content_type='text/x-rst',
 
 long_description="""
-``roboworld`` is an educational ``Python``-package designed for students to learn the basic programming concepts, such as,
+``roboworld`` is an educational ``Python``-package designed for students to learn basic programming concepts, such as,
 
 + variables,
 + function calls,
@@ -24,20 +24,15 @@ long_description="""
 + loops and
 + recursion.
 
-It consists of a ``World`` and the ``Agent``, a roboter that can be moved within the ``World``.
-The ``World`` is a two-dimensional grid consisting of an ``Agent``, a spatial goal (a special gridpoint), movable and immovable objects.
-The ``World`` can be seen as a cellular atomaton.
-Students have to design algorithm that move the ``Agent`` to its goal.
+Students have to navigate ``Robo`` (a roboter) through different two-dimensional discrete ``Worlds``.
+``Robo`` represents a very simplistic machine that can only deal with very basic instructions, i.e., method calls.
+Therefore, students have to extend the missing functionality step by step.
+By this process they learn
 
-However, the ``Agent`` only offers very basic methods, such as,
-
-+ move one step forward, 
-+ turn left by 90 degree, 
-+ check if there is an obstacle in front.
-
-Therefore, students have to prorgamm more sophisticated methods by themselves.
-The learning goal is that they, step by step, build a set of function to navigate within different worlds.
-And by doing so, they hopefully pick up the most important programming fundamentals.
+1. to divde a problem into smaller pieces,
+2. to abstract,
+3. to recoginze pattern, and 
+4. to design and implement algorithms.
 """
 
 setup_kwargs = {

@@ -1,4 +1,6 @@
 # external modules
+from matplotlib.animation import FuncAnimation
+from matplotlib.figure import Figure
 import numpy as np
 
 # std lib
@@ -8,8 +10,8 @@ import random
 import enum
 
 # local modules
-from .vector import D2DVector
-from .visualization import MatplotVisualizer
+from roboworld.vector import D2DVector
+from roboworld.visualization import MatplotVisualizer
 
 class CellState(enum.IntEnum):
     """
@@ -77,6 +79,9 @@ class Orientation(enum.Enum):
         else:
             return 3
 
+    def __str__(self) -> str:
+        return self.__repr__()
+    
     def __repr__(self) -> str:
         """Transforms the direction to to a string.
 
@@ -134,9 +139,20 @@ class World():
 
         # determine the goal position if it is undefined
         if goal_position == None:
-            while goal_position == None or (goal_position == robo_initial_position and (ncols > 1 or nrows > 1)):
-                goal_position = D2DVector(np.random.randint(0, nrows), np.random.randint(0, ncols))
+            # determine all possible positions
+            possibilities = []
+            for row in range(nrows):
+                for col in range(ncols):
+                    if cells[row][col] == CellState.EMPTY:
+                        vec = D2DVector(row, col)
+                        if vec != robo_initial_position:
+                            possibilities.append(vec)
 
+            if len(possibilities) == 0:
+                raise InvalidWorldArgumentsExeception(f'The goal can not be placed. No EMPTY cell available.')
+            
+            goal_position = possibilities[random.randint(0, len(possibilities)-1)]
+                   
         self._grid : Grid = Grid(cells, goal_position)
 
         # determine the robo position if it is undefined
@@ -159,32 +175,51 @@ class World():
 
     @property
     def robo(self):
-        """Returns the robo of the world."""
+        """
+        Returns the Robo of the world.
+        
+        :return: The Robo of the world.
+        :rtype: RoboProxy
+        """
         return RoboProxy(self._robo)
 
     def is_successful(self):
-        """Returns true if and only if the roboter found its goal."""
+        """
+        Returns True if and only if the Robo found its goal.
+        
+        :return: True if and only if the Robo found its goal.
+        :rtype: bool
+        """
         return self._robo.is_at_goal()
 
     # visualization (matplotlib is the default)
-    def show(self, scale=0.5, visualizer = lambda robo, scale: MatplotVisualizer().show(robo, scale=scale)) -> any:
-        """Returns a displayabel representation of the world."""
+    def show(self, scale=0.5, visualizer = lambda robo, scale: MatplotVisualizer().show(robo, scale=scale)) -> Figure:
+        """
+        Returns a displayabel representation (a figure) of the world.
+        
+        :param scale: Optional scaling of the figure.
+        :type scale: int
+        :param visualizer: Optional function that contructs the figure.
+        :type visualizer: Function (Robo, float) -> Figure
+        :return: A displayabel representation (a figure) of the world.
+        :rtype: Figure
+        """
         fig = visualizer(self._robo, scale)
         return fig
 
-    def animate(self, scale=0.5, animator = lambda recorder, scale: MatplotVisualizer().animate(recorder, scale=scale)) -> any:
+    def animate(self, scale=0.5, animator = lambda recorder, scale: MatplotVisualizer().animate(recorder, scale=scale)) -> FuncAnimation:
         """
         Returns a displayable animation of the recorder that was lastely added to the roboter.
         A recorder records the movements and actions of the robo.
         The generated animation reflects this.
         The Animation is defined by the animator (strategy pattern)
 
-        Args:
-            scale (float, optional): _description_. Defaults to 0.5.
-            animator (MatplotVisualizer, optional): _description_. Defaults to lambdarecorder.
-
-        Returns:
-            any: animation.FuncAnimation
+        :param scale: Optional scaling of the figure.
+        :type scale: int
+        :param animator: Optional function that contructs the animation.
+        :type animator: Function (Robo, float) -> FuncAnimation
+        :return: A displayable animation of the recorder that was lastely added to the roboter.
+        :rtype: FuncAnimation
         """
         if len(self._robo.recorders) <= 0:
             return None
@@ -220,32 +255,48 @@ class World():
             self.remove_recorder(recorder)
 
     def pause_recordings(self):
-        """Pauses all recorders."""
+        """
+        Pauses all recorders.
+        """
         for recorder in self._robo.recorders:
             recorder.pause()
 
     def resume_recordings(self):
-        """Resumes all recorders."""
+        """
+        Resumes all recorders.
+        """
         for recorder in self._robo.recorders:
             recorder.resume()
 
     def clear_recordings(self):
-        """Resumes resets all recorders."""
+        """
+        Clears/resets all recorders.
+        This will free the memory required for the recordings.
+        """
         for recorder in self._robo.recorders:
             recorder.clear()
 
     # compatibility reasons
     def disable_animation(self):
-        """Pauses and resets all recorders."""
+        """
+        Pauses and clears/resets all recorders.
+        """
         self.pause_recordings()
         self.clear_recordings()
 
     def enable_animation(self):
-        """Resumes all recorders."""
+        """
+        Resumes all recorders (identical to resume_recordings())
+        """
         self.resume_recordings()
 
     def get_robo(self):
-        """Returns the robo of the world."""
+        """
+        Returns the Robo of the world.
+        
+        :return: The Robo of the world.
+        :rtype: RoboProxy
+        """
         return self.robo
 
     # static factory methods
@@ -297,25 +348,21 @@ class World():
         return World.str_to_world(text)
 
     @staticmethod
-    def simple_leaf1():
+    def leaf_corridor(nleafs:int=0):
         """
         Returns a corridor with 3 leafs.
         
         Returns:
             World: a new world, i.e., a corridor containing leafs.
         """
-        text = """E
-L
--
-L
-L
--
-G"""
-        return World.str_to_world(text)
+        text = """EL-LL-G"""
+        return World.str_to_world(text, nleafs)
 
     @staticmethod
-    def simple_tunnel(tunnel_length:int=4, length:int=8, goal_at_end=True):
-        """_summary_
+    def tunnel(tunnel_length:int=4, length:int=8, goal_at_end=True):
+        """
+        Returns a (3 times length) large world conisting of a tunnel.
+        The tunnel is randomly placed.
 
         Args:
             tunnel_length (int, optional): length of the tunnel. Defaults to 4.
@@ -358,12 +405,22 @@ G"""
         return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(1,0), goal_position=D2DVector(1,goal_col))
 
     @staticmethod
-    def simple_slalom(lentgth:int=8, walls:int=3):
+    def simple_slalom(lentgth:int=8, nwalls:int=3):
+        """
+        Returns a (three times length) World where immovable walls are randomly placed in the center.
+
+        Args:
+            lentgth (int, optional): ncols of the world. Defaults to 8.
+            nwalls (int, optional): number of randomly placed walls. Defaults to 3.
+
+        Returns:
+            World: a (three times length) World
+        """
         possibilities = list(range((lentgth-1)//2))
-        walls = min(len(possibilities), walls)
+        nwalls = min(len(possibilities), nwalls)
         
         choices = []
-        for _ in range(walls):
+        for _ in range(nwalls):
             index = random.randint(0,len(possibilities)-1)
             choices.append(possibilities[index])
             del possibilities[index]
@@ -380,7 +437,18 @@ G"""
         return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=robo_direction, robo_initial_position=D2DVector(1,0), goal_position=D2DVector(1,lentgth-1))
 
     @staticmethod
-    def multi_slalom(lentgth:int=8, gaps:int=3):
+    def multi_slalom(lentgth:int=8, ngaps:int=3):
+        """
+        Returns a (three times length) World where immovable walls are randomly placed in the center.
+        In fact, the center is a wall with ngaps gaps.
+
+        Args:
+            lentgth (int, optional): number of columns of the world. Defaults to 8.
+            ngaps (int, optional): number of gaps within the wall. Defaults to 3.
+
+        Returns:
+            World: a (three times length) World where immovable walls are randomly placed in the center.
+        """
         top = [CellState.EMPTY for _ in range(lentgth)]
         center = [CellState.EMPTY] + [CellState.WALL for _ in range(lentgth-2)] + [CellState.EMPTY]
         bottom = [CellState.EMPTY for _ in range(lentgth)]
@@ -388,7 +456,7 @@ G"""
         possibilities = list(range(1,lentgth-2))
         choices = []
 
-        for _ in range(gaps):
+        for _ in range(ngaps):
             index = random.randint(0,len(possibilities)-1)
             choices.append(possibilities[index])
             del possibilities[index]
@@ -434,7 +502,15 @@ G"""
 
     @staticmethod
     def sorting(n:int=8):
-        """Returns a non-randomized world where the idea is that robo inverts the leafs / empty cells."""
+        """
+        Returns a randomized world where each column represents a number in a list.
+
+        Args:
+            n (int, optional): number of numbers to sort. Defaults to 8.
+
+        Returns:
+            World: a randomized world where each column represents a number in a list.
+        """
         cells = [[CellState.LEAF for _ in range(random.randint(1,n))] for _ in range(n)]
         for row in cells:
             row += [CellState.EMPTY for _ in range(1+n-len(row))]
@@ -442,7 +518,7 @@ G"""
         return World(nrows=len(cells), ncols=len(cells[0]), cells=cells, robo_orientation=Orientation.WEST, robo_initial_position=D2DVector(0,n), goal_position=D2DVector(n-1,n))
 
     @staticmethod
-    def game_of_life1():
+    def game_of_life():
         """Returns a non-randomized world where the idea is that robo plays the game of life."""
         text = """E---------
 ---L------
@@ -453,10 +529,10 @@ LLLLLLL---
 -LLLLL----
 --LLL-----
 ---L-----G"""
-        return World.str_to_world(text)
+        return World.str_to_world(text, len(text)) 
 
     @staticmethod
-    def invert():
+    def leaf_cross(nleafs:int=0):
         """Returns a non-randomized world where the idea is that robo inverts the leafs / empty cells."""
         text = """LL-----LL
 LLL---LLL
@@ -467,7 +543,7 @@ LLL---LLL
 -LLL-LLL-
 LLL---LLL
 LLG---ELL"""
-        return World.str_to_world(text)
+        return World.str_to_world(text, nleafs)
 
     def hole_maze(nrows:int=11, ncols:int=10):
         cells = [[CellState.EMPTY if row%2==0 else CellState.WALL for _ in range(ncols)] for row in range(nrows)]
@@ -485,19 +561,19 @@ LLG---ELL"""
         """
         Returns a complex, randomly generated (nrows times ncols) maze.
         It is guaranteed that there is a path from the roboter to its goal.
-        
-        Parameters
-        ----------
-        nrows: int
-            Number of rows of the maze.
-        ncols: int
-            Number of columns of the maze.
-        nobjects: int
-            robo_direction
-            The orientation of the roboter (EAST, NORTH, WEST, SOUTH).
-            If the parameter is robo_direction==None, the orientation is picked randomly.
-            The roboter's position is randomly determined.
+
+        Args:
+            nrows (int, optional): number of rows of the maze.. Defaults to 10.
+            ncols (int, optional): number of columns of the maze.. Defaults to 10.
+            robo_direction (Orientation, optional): initial orientation of the roboter. Defaults to None.
+
+        Raises:
+            ValueError: if the maze is too small.
+
+        Returns:
+            World: a world, i.e., a complex, randomly generated (nrows times ncols) maze
         """
+    
         if nrows + ncols < 2:
             raise ValueError('nrows + ncols < 2')
 
@@ -673,17 +749,19 @@ class Grid():
         """Returns a str-representation of the grid including the robo."""
         representation = ''
         for row in range(self.nrows-1,-1,-1):
-            for col in range(self.cells[row]):
+            for col in range(self.ncols):
                 state = self.cells[row][col]
                 char = "-"
                 if robo != None and robo._is_at(row, col):
-                    char = robo._tochar()
+                    char = robo._char()
+                elif self.goal_position == D2DVector(row, col):
+                    char = 'G'
                 elif state == CellState.WALL:
                     char = '#'
                 elif state == CellState.STONE:
                     char = 'O'
-                elif state == CellState.GOAL:
-                    char = 'G'
+                elif state == CellState.LEAF:
+                    char = 'L'
                 else:
                     char = '-'
                 representation += char
@@ -705,7 +783,7 @@ class Grid():
     #    return self._get_state(row, col) == CellState.ROBO or self._get_state(row, col) == CellState.ROBO_AT_GOAL
 
     def _is_stone_at(self, row: int, col: int):
-        """Returns true if and only if a moveable object is at (row, col)."""
+        """Returns true if and only if a moveable stone is at (row, col)."""
         return self._get_state(row, col) == CellState.STONE
 
     def _is_leaf_at(self, row: int, col: int):
@@ -801,8 +879,8 @@ class Robo():
     """
     A representation of the roboter of the robo world.
 
-    A roboter occupies exactly one cell. It can pick up and carray at most one moveable object.
-    Objects can only put at empty cells.
+    A roboter occupies exactly one cell. It can pick up and carray at most one moveable stone.
+    Stones can only put at empty cells.
     Robo can turn by 90 degree to the left.
     It can only analyse the cell directly in front, therefore, it has an orientation (headway).
     It can mark and unmark cells it occupies but can only spot marks in front.
@@ -816,7 +894,7 @@ class Robo():
     orientation:
         The current orientation of the headway of the roboter (EAST, WEST, NORTH or SOUTH)
     stone:
-        The current object the roboter is carrying (if any)
+        The current stone the roboter is carrying (if any)
     marks: int
         Number of marks the roboter has set and not unset
     print_actions: bool
@@ -835,7 +913,7 @@ class Robo():
 
     def __repr__(self) -> str:
         """Returns a str-representation of the roboter."""
-        return f'robo at {self.position} headway is oriented {self.orientation}.'
+        return f'position = {self.position}, orientation = {self.orientation}.'
 
     def notify_recorders(self):
         for recorder in self.recorders:
@@ -851,26 +929,28 @@ class Robo():
 
     # non-privates
     def is_stone_in_front(self) -> bool:
-        """Returns True if and only if there is an object in front of robo."""
+        """Returns True if and only if there is a stone in front of robo."""
         return self.__get_state_at(self.orientation) == CellState.STONE
 
     def take_stone_in_front(self) -> None:
         """
-        Takes an object.
+        Takes a stone in front.
         
         Raises
         ------
         SpaceIsFullException
-            If robo already carries an object
+            If robo already carries a stone
         WallInFrontException
-            If there is a wall in front, i.e., no object
-        ObjectMissingException
-            If there is no object in front
+            If there is a wall in front, i.e., no stone
+        StoneMissingException
+            If there is no stone in front
         """
         if self.stone != None:
             raise SpaceIsFullException()
         if self.is_wall_in_front():
             raise WallInFrontException()
+        if self.is_leaf_in_front():
+            raise LeafInFrontException()
         if not self.is_stone_in_front():
             raise StoneMissingException()
         self.stone = self.grid._remove_stone_at(*self.__front())
@@ -886,7 +966,7 @@ class Robo():
         SpaceIsEmptyException
             If robo does not carry a stone
         WallInFrontException
-            If there is a wall in front, i.e., no object
+            If there is a wall in front, i.e., no stone
         StoneInFrontException
             If there is another stone in front
         LeafInFrontException
@@ -957,8 +1037,8 @@ class Robo():
         ------
         WallInFrontException
             If there is an (immoveable) wall in front (obstacle or boundary of the world)
-        ObjectInFrontException
-            If there is an object (moveable) in front
+        StoneInFrontException
+            If there is an stone (moveable) in front
         """
         before = self.position
         if self.is_wall_in_front():
@@ -986,7 +1066,7 @@ class Robo():
         self.notify_recorders()
 
     def is_carrying_stone(self) -> bool:
-        """Returns True if and only if robo is carrying an object."""
+        """Returns True if and only if robo is carrying a stone."""
         return self.stone != None
 
     def turn_left(self) -> None:
@@ -1150,88 +1230,125 @@ class RoboProxy:
         self._robo = robo
 
     def __repr__(self) -> str:
-        """Returns a str-representation of the roboter."""
+        """
+        Returns a str-representation of the roboter.
+        """
         return self._robo.__repr__()
 
     def disable_print(self) -> None:
-        """Deactivates the printing."""
+        """
+        Deactivates the printing of executed Robo-instructions
+        """
         self._robo.print_actions = False
 
     def enable_print(self) -> None:
-        """Activates the printing."""
+        """
+        Activates the printing of executed Robo-instructions.
+        """
         self._robo.print_actions = True
 
     # methods that can be used by the learners
     def take_stone_in_front(self) -> None:
         """
-        Takes an object.
+        Takes a stone that is in front.
         
-        Raises
-        ------
-        SpaceIsFullException
-            If robo already carries an object
-        WallInFrontException
-            If there is a wall in front, i.e., no object
-        ObjectMissingException
-            If there is no object in front
+        :raises SpaceIsFullException: If Robo does already carry a stone.
+        :raises WallInFrontException: If there is a wall in front, i.e., no stone.
+        :raises LeafInFrontException: If there is a leaf in front.
+        :raises StoneMissingException: If there is no stone in front.
         """
         self._robo.take_stone_in_front()
 
     def put_stone_in_front(self) -> None:
         """
-        Puts the carrying object down in front.
+        Puts the carrying stone down in front.
         
-        Raises
-        ------
-        SpaceIsEmptyException
-            If robo does not carry an object
-        WallInFrontException
-            If there is a wall in front, i.e., no object
-        ObjectInFrontException
-            If there is another object in front
+        :raises SpaceIsEmptyException: If Robo does not carry a stone.
+        :raises WallInFrontException: If there is a wall in front, i.e., no stone.
+        :raises StoneInFrontException: If there is another stone in front.
+        :raises LeafInFrontException: If there is a leaf in front.
         """
         self._robo.put_stone_in_front()
 
     def is_leaf_in_front(self) -> bool:
-        """Returns True if and only if thre is a leaf in front."""
+        """
+        Returns True if and only if thre is a leaf in front.
+        
+        :return: True if and only if thre is a leaf in front.
+        :rtype: bool
+        """
         return self._robo.is_leaf_in_front()
 
     def is_front_clear(self) -> bool:
-        """Returns True if and only if thre is no wall in front, i.e., no (immoveable) obstacle and not the boundary of the world."""
+        """
+        Returns True if and only if thre is no wall in front, i.e., no (immoveable) wall and not the boundary of the world.
+        
+        :return: True if and only if thre is no wall in front, i.e., no (immoveable) wall and not the boundary of the world.
+        :rtype: bool
+        """
         return self._robo.is_front_clear()
 
     def is_mark_in_front(self) -> bool:
-        """Returns True if and only if there is a mark in front."""
+        """
+        Returns True if and only if there is a mark in front.
+        
+        :return: True if and only if there is a mark in front.
+        :rtype: bool
+        """
         return self._robo.is_mark_in_front()
 
     def is_wall_in_front(self) -> bool:
-        """Returns True if and only if there is an (immoveable) obstacle or the boundary of the world in front."""
+        """
+        Returns True if and only if there is an (immoveable) wall or the boundary of the world in front.
+        
+        :return: True if and only if there is an (immoveable) wall or the boundary of the world in front.
+        :rtype: bool
+        """
         return self._robo.is_wall_in_front()
 
     def is_stone_in_front(self) -> bool:
-        """Returns True if and only if there is an object in front of robo."""
+        """
+        Returns True if and only if there is a stone in front of robo.
+        
+        :return: True if and only if there is a stone in front of robo.
+        :rtype: bool
+        """
         return self._robo.is_stone_in_front()
 
     def is_carrying_leafs(self) -> bool:
-        """Returns True if and only if thre the robo carries any leafs."""
+        """
+        Returns True if and only if thre the robo carries any leafs.
+        
+        :return: True if and only if thre the robo carries any leafs.
+        :rtype: bool
+        """
         return self._robo.is_carrying_leafs()
 
     def put_leaf(self) -> None:
+        """
+        Puts a leaf at Robo's current position.
+        
+        :raises NoMoreLeafsException: If Robo does not carry any leaf.
+        :raises CellOccupiedException: If there is an object (leaf, wall, stone) at the current cell.
+        """
         self._robo.put_leaf()
         
     def take_leaf(self) -> None:
+        """
+        Takes a leaf at Robo's current position.
+        
+        :raises LeafMissingException: If there is no leaf the Robo's position.
+        """
         self._robo.take_leaf()
 
     def move(self) -> D2DVector:
         """
-        Moves robo one cell ahead.
+        Moves Robo one cell ahead.
         
-        Raises
-        ------
-        WallInFrontException
-            If there is an (immoveable) wall in front (obstacle or boundary of the world)
-        ObjectInFrontException
-            If there is an object (moveable) in front
+        :raises WallInFrontException: If there is an (immoveable, not traverseable) wall in front (WALL or boundary of the world).
+        :raises StoneInFrontException: If there is a stone (moveable, not traverseable) in front.
+        :return: Robo's new position.
+        :rtype: D2DVector
         """
         return self._robo.move()
     
@@ -1240,31 +1357,57 @@ class RoboProxy:
         return self._robo.position
 
     def set_mark(self) -> None:
-        """Marks the current cell, i.e., position."""
+        """
+        Marks the current cell, i.e., position.
+        """
         self._robo.set_mark()
 
     def unset_mark(self) -> None:
-        """Unmarks the current cell, i.e., position."""
+        """
+        Unmarks the current cell, i.e., position.
+        """
         self._robo.unset_mark()
 
     def is_carrying_stone(self) -> bool:
-        """Returns True if and only if robo is carrying an object."""
+        """
+        Returns True if and only if robo is carrying a stone.
+        
+        :return: True if and only if robo is carrying a stone.
+        :rtype: bool
+        """
         return self._robo.is_carrying_stone()
 
     def turn_left(self) -> None:
-        """Robo turns 90 degrees to the left."""
+        """
+        Robo turns 90 degrees to the left (counter-clockwise order NORTH->WEST->SOUTH->EAST).
+        """
         self._robo.turn_left()
 
     def is_facing_north(self) -> bool:
-        """Returns True if and only if robo is oriented towords the north."""
+        """
+        Returns True if and only if robo is oriented towords the north.
+        
+        :return: True if and only if robo is oriented towords the north.
+        :rtype: bool
+        """
         return self._robo.is_facing_north()
 
     def toss(self) -> bool:
-        """Returns randomly True or False."""
+        """
+        Returns randomly True or False.
+        
+        :return: Either True or False by chance 50/50.
+        :rtype: bool
+        """
         return self._robo.toss()
 
     def is_at_goal(self) -> bool:
-        """Returns True if and only if robo is standing at the goal."""
+        """
+        Returns True if and only if robo is standing at the goal.
+        
+        :return: True if and only if robo is standing at the goal.
+        :rtype: bool
+        """
         return self._robo.is_at_goal()
     
 class RoboException(Exception):
@@ -1305,13 +1448,13 @@ class NoMoreLeafsException(RoboException):
         super().__init__(self.message)
 
 class StoneMissingException(RoboException):
-    def __init__(self, message="There is no object in front that can be taken."):
+    def __init__(self, message="There is no stone in front that can be taken."):
         self.message = message
         super().__init__(self.message)
 
 
 class StoneInFrontException(RoboException):
-    def __init__(self, message="The space in front is occupied by an object."):
+    def __init__(self, message="The space in front is occupied by a stone."):
         self.message = message
         super().__init__(self.message)
 

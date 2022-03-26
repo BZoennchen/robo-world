@@ -1,9 +1,13 @@
+# std modules
 import random
 import unittest
+import roboworld
+from roboworld.visualization import MatplotVisualizer
 
-from roboworld.roboworld import CellState
-from roboworld.roboworld import Orientation
-from roboworld.roboworld import CellOccupiedException, LeafMissingException, SpaceIsEmptyException, SpaceIsFullException, StoneInFrontException, StoneMissingException, World
+# local modules
+from roboworld.world import CellState
+from roboworld.world import Orientation
+from roboworld.world import CellOccupiedException, LeafMissingException, SpaceIsEmptyException, SpaceIsFullException, StoneInFrontException, StoneMissingException, World
 from roboworld.vector import D2DVector
 
 def create_wall_corridor():
@@ -156,3 +160,71 @@ class Test3Right1Up(unittest.TestCase):
         robo._Robo__move_north()
         robo_position = robo._Robo__move_north()
         self.assertEqual(robo_position, D2DVector(7, 7), f'{robo_position} != {D2DVector(7, 7)}')
+      
+class TestDeterministicWalk(unittest.TestCase):
+    def test(self):
+        def walk_to_wall(robo, condition = lambda robo: True):
+            while not robo.is_wall_in_front() and condition(robo):
+                robo.move()
+
+        def turn(robo):
+            robo.turn_left()
+            robo.turn_left()
+        
+        def turn_north(robo):
+            while not robo.is_facing_north():
+                robo.turn_left()
+
+        def turn_west(robo):
+            turn_north(robo)
+            robo.turn_left()
+
+        def turn_south(robo):
+            turn_north(robo)
+            turn(robo)
+
+        def turn_east(robo):
+            turn_west(robo)
+            turn(robo)
+            
+        def walk_west(robo, condition = lambda robo: True):
+            turn_west(robo)
+            walk_to_wall(robo, condition)
+            
+        def walk_north(robo, condition = lambda robo: True):
+            turn_north(robo)
+            walk_to_wall(robo, condition)
+
+        def walk_south(robo, condition = lambda robo: True):
+            turn_south(robo)
+            walk_to_wall(robo, condition)
+            
+        def walk_north_west(robo, condition = lambda robo: True):
+            walk_west(robo, condition)
+            walk_north(robo, condition)
+
+        def determined_walk(robo):
+            condition = lambda robo: not robo.is_at_goal()
+            
+            walk_north_west(robo, condition)
+                
+            down = True
+            while not robo.is_at_goal():
+                if down:
+                    walk_south(robo, condition)
+                else:
+                    walk_north(robo, condition)
+                turn_east(robo)
+                if not robo.is_at_goal() and not robo.is_wall_in_front():
+                    robo.move()
+                down = not down  
+                
+        nrows = 11
+        ncols = 11
+        world = roboworld.new_world(nrows=nrows, ncols=ncols)
+        robo = world.robo
+        determined_walk(robo)
+        self.assertTrue(robo.is_at_goal())
+        
+if __name__ == '__main__':
+    unittest.main()

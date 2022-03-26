@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import animation
 
-# local modules
-from .roboworld import CellState
-
 def array(robo):
     """
     Transforms the current state of robo into a numpy-array which can be plotted.
@@ -16,11 +13,15 @@ def array(robo):
         robo (Robo): the roboter
 
     Returns:
-        _type_: a numpy-array which can be plotted
+        numpy.array: a numpy-array which can be plotted
     """
+    
+    # magic number!
+    cellstate_goal = 12
+    
     arr = np.array(robo.grid.cells)
     arr[robo.position[0],robo.position[1]] = robo.orientation.to_int()
-    arr[robo.grid.goal_position[0],robo.grid.goal_position[1]] = CellState.GOAL
+    arr[robo.grid.goal_position[0],robo.grid.goal_position[1]] = cellstate_goal
     return arr
 
     # ROBO = 0,1,2,3
@@ -155,5 +156,4 @@ class MatplotVisualizer:
             Figure: figure representing the frame
         """
         _, fig = self.plot(array(robo), dpi=dpi, scale=scale)
-        plt.close()
         return fig
