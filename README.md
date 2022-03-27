@@ -2,7 +2,16 @@
 
 ## Installation
 
-``sudo python setup.py install``
+```
+git clone https://github.com/BZoennchen/robo-world.git
+sudo python setup.py install
+```
+
+or via ``pip``
+
+```
+pip install roboworld
+```
 
 ## Purpose
 
