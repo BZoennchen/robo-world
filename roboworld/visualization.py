@@ -9,13 +9,11 @@ def array(robo):
     """
     Transforms the current state of robo into a numpy-array which can be plotted.
 
-    Args:
-        robo (Robo): the roboter
-
-    Returns:
-        numpy.array: a numpy-array which can be plotted
+    :param robo: The roboter
+    :type robo: Robo
+    :return: A numpy-array which can be plotted
+    :rtype: numpy.array
     """
-    
     # magic number!
     cellstate_goal = 12
     
@@ -76,19 +74,22 @@ class MatplotVisualizer:
         Returns a displayable animation of the movement of the roboter.
         Note that this call will clear the animation stack such that the next anmiation starts with the current situation.  
 
-        Args:
-            recorder: the recorder that recorded the animation 
-            interval (int, optional): delay between animation frames in milliseconds. Defaults to 150.
-            save (bool, optional): if True a gif will be saved at a default path or path specified. Defaults to False.
-            dpi (int, optional): controls the dots per inch for the movie frames. Together with the figure's size in inches, this controls the size of the movie. Defaults to 60.
-            scale (float, optional): scale of the figure. Defaults to 0.5.
-            path (str, optional): relative path, i.e. the location of the saved figure. Defaults to None.
-
-        Raises:
-            Exception: _description_
-
-        Returns:
-            animation.FuncAnimation: _description_
+        :param recorder: The the recorder that recorded the animation.
+        :type recorder: ArrayRecorder
+        :param interval: Optional delay between animation frames in milliseconds.
+        :type interval: int
+        :param save: Optional, if True a gif will be saved at a default path or path specified. Defaults to False.
+        :type save: bool
+        :param dpi: Optional, controls the dots per inch for the movie frames. Together with the figure's size in inches, this controls the size of the movie.
+        :type dpi: int
+        :param scale: Optional, scale of the figure.
+        :type scale: float
+        :param path: Optional, relative path, i.e. the location of the saved figure.
+        :type path: str
+        
+        :raise Exception: If there is something going wrong with the I/O.
+        :return: A displayable animation of the movement of the roboter.
+        :rtype: FuncAnimation
         """
        
         if len(recorder.frames) <= 0:
@@ -115,17 +116,19 @@ class MatplotVisualizer:
                 anim.save(path, dpi=dpi)
         return anim
 
-    def plot(self, frame, dpi=80, scale=0.5):
+    def plot(self, frame, dpi=60, scale=0.5):
         """
         Transforms a frame of the recording, i.e., a numpy array into a figure.
 
-        Args:
-            matrix (numpy.array): the frame
-            dpi (int, optional): dpi of the resulting figure. Defaults to 80.
-            scale (float, optional): scale of the figure. Defaults to 0.5.
-
-        Returns:
-            Axis, Figure: (axis and) figure representing the frame
+        :param matrix: The frame.
+        :type matrix: numpy.array
+        :param dpi: Optional, controls the dots per inch for the movie frames. Together with the figure's size in inches, this controls the size of the movie.
+        :type dpi: int
+        :param scale: Optional, scale of the figure.
+        :type scale: float
+        
+        :return: Axis, Figure: (axis and) Figure representing the frame
+        :rtype: tuple[Axis,Figure]            
         """
         nrows, ncols = frame.shape
         fig = plt.figure(figsize=(ncols * scale, nrows * scale), dpi=dpi)
@@ -145,15 +148,19 @@ class MatplotVisualizer:
         return matplt, fig
 
     def show(self, robo, dpi=80, scale=0.5) -> Figure:
-        """Returns a displayabel representation of the world, i.e. a figure.
-
-        Args:
-            robo (Robo): the roboter
-            dpi (int, optional): dpi of the resulting figure. Defaults to 80.
-            scale (float, optional): scale of the figure. Defaults to 0.5.
-
-        Returns:
-            Figure: figure representing the frame
         """
+        Returns a displayabel representation of the world, i.e. a figure.
+        
+        :param robo: The roboter
+        :type robo: Robo
+        :param dpi: Optional, controls the dots per inch for the movie frames. Together with the figure's size in inches, this controls the size of the movie.
+        :type dpi: int
+        :param scale: Optional, scale of the figure.
+        :type scale: float
+        
+        :return: A displayabel representation of the world, i.e. a figure.
+        :rtype: Figure           
+        """
+        
         _, fig = self.plot(array(robo), dpi=dpi, scale=scale)
         return fig

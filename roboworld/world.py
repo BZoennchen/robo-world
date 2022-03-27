@@ -104,7 +104,7 @@ class World():
     The world the roboter is exploring.
 
     The world is the rectangular discrete grid of a cellular automaton.
-    A cell can be in one of three CellState: EMPTY (0), WALL (1, immoveable), STONE (3, moveable).
+    A cell can be in one of four CellState: EMPTY, WALL (immovable, none-traversable), STONE (moveable, none-traversable), LEAF (moveable), traversable).
     """
 
     def __init__(self, nrows:int, ncols:int, cells:StateGrid=None, 
@@ -118,17 +118,25 @@ class World():
         If robo_positionn==None, the roboter position will be the center of the grid.
         If goal_position==None, the goal will be placed randomly such that it is distinct from the robo position.
         
-        Args:
-            nrows (int): number of rows
-            ncols (int): number of cols
-            cells (StateGrid, optional): predefined grid. Defaults to None.
-            robo_orientation (Orientation, optional): initial orientation of the roboter of this world. Defaults to Orientation.NORTH.
-            robo_initial_position (D2DVector, optional): initial position of the roboter of this world. Defaults to None.
-            goal_position (D2DVector, optional): immoveable goal position. Defaults to None.
-            nleafs (int, optional): initial number of leafs of the roboter. Defaults to 0.
-
-        Raises:
-            InvalidWorldArgumentsExeception: if the predefined grid does not match with nrows and ncols or any position is outside of the grid.
+        :param nrows: Number of rows.
+        :type nrows: int
+        :param cols: Number of cols.
+        :type cols: int
+        :param cells: Optional predefined grid.
+        :type cells: StateGrid
+        :param robo_orientation: Optional initial orientation of the roboter of this world. Defaults to Orientation.NORTH.
+        :type robo_orientation: Orientation
+        :param robo_initial_position: Optional initial position of the roboter of this world. Defaults to None.
+        :type robo_initial_position: D2DVector
+        :param goal_position: Optional immoveable goal position. Defaults to None.
+        :type goal_position: D2DVector
+        :param nleafs: Optional initial number of leafs of the roboter. Defaults to 0.
+        :type nleafs: int
+        
+        :rtype: World
+        :return: A new world
+        
+        :raise InvalidWorldArgumentsExeception: If the predefined grid does not match with nrows and ncols or any position is outside of the grid.
         """
 
         # generate empty grid if cell is undefined
@@ -165,12 +173,22 @@ class World():
         self._robo : Robo = Robo(robo_initial_position, self._grid, orientation=robo_orientation, nleafs=nleafs)
 
     def __repr__(self) -> str:
-        """Returns a str-representation of the robo world."""
+        """
+        Returns a str-representation of the robo world.
+        
+        :return: A string representation of the world.
+        :rtype: str
+        """
         return self._grid.torepr(self._robo)
 
     @property
     def grid(self):
-        """Returns a deepcopy of the grid to avoid direct manipulation of it."""
+        """
+        Returns a deepcopy of the grid to avoid direct manipulation of it.
+        
+        :return: A deep-copy of the grid.
+        :rtype: Grid
+        """
         return copy.deepcopy(self._grid)
 
     @property
@@ -230,8 +248,8 @@ class World():
         """
         Adds and starts a recorder such that it will be notified about the roboters actions.
         
-        Args:
-            recorder: the recorder (observer)
+        :param recorder: A oberver that will records the roboters instructions.
+        :type recorder: ArrayRecorder
         """
         self._robo.recorders.append(recorder)
         recorder.resume()
@@ -241,8 +259,8 @@ class World():
         """
         Removes and stops a recorder if it is actually registered.
         
-        Args:
-            recorder: the recorder (observer)        
+        :param recorder: A oberver that currently records the roboters instructions.
+        :type recorder: ArrayRecorder    
         """
         rec = self._robo.recorders.remove(recorder)
         if rec != None:
@@ -303,20 +321,21 @@ class World():
     @staticmethod
     def corridor(length:int=10, random_headway:bool=False, nstones:int=0):
         """
-        Returns a corridor (1-D cellular automaton) filled with randomly placed moveable stones.
+        Returns a corridor (1 times length world) filled with randomly placed moveable stones.
         The roboter is placed right at the beginning of the corridor.
         There can be at most length-3 stones because there can be no at the cell occupied by the roboter and the goal.
         Furthermore at least one neighboring cell of the roboter has to be empty, otherwise the roboter is stuck (impossible task).
 
-        Args:
-            length (int, optional): length of the corridor.. Defaults to 10.
-            random_headway (bool, optional): if True the orientation of the roboter is determined randomly, otherwise it is EAST.. Defaults to False.
-            nstones (int, optional): Number of stones. Defaults to 0.
+        :param length: Optional length of the corridor.
+        :type length: int
+        :param random_headway: Optional, if True the orientation of Robo is randomly choosen. Otherwise Robo is oriented towards the EAST.
+        :type random_headway: bool
+        :param nstones: Optional randomly placed stones.
+        :type nstones: int
 
-        Returns:
-            World: a new world, i.e., a corridor containing stones.
+        :return: A (1 times length) world (corridor) containing stones.
+        :rtype: World
         """
-
         stones = [CellState.STONE for _ in range(min(nstones, length-3))]
         emptys = [CellState.EMPTY for _ in range(length-3-len(stones))]
         combined = stones + emptys
@@ -334,9 +353,8 @@ class World():
         """
         Returns a small 6 times 13 simple maze.
         
-        Returns:
-            World: a new world, i.e., a maze.
-        
+        :return: An empty maze.
+        :rtype: World
         """
         text = """N#---#---#---
 -#-#-#-#-#-#-
@@ -350,10 +368,10 @@ class World():
     @staticmethod
     def leaf_corridor(nleafs:int=0):
         """
-        Returns a corridor with 3 leafs.
+        Returns a (1 times 7 world) corridor with 3 leafs.
         
-        Returns:
-            World: a new world, i.e., a corridor containing leafs.
+        :return: A (1 times 7) world (corridor) containing 3 leafs.
+        :rtype: World
         """
         text = """EL-LL-G"""
         return World.str_to_world(text, nleafs)
@@ -363,17 +381,17 @@ class World():
         """
         Returns a (3 times length) large world conisting of a tunnel.
         The tunnel is randomly placed.
+        
+        :param tunnel_length: Optional length of the tunnel.
+        :type tunnel_length: int
+        :param length: Optional length of the corridor.
+        :type length: int
+        :param goal_at_end: Optional either the goal is palced at the start (False) or end (True) of the tunnel.
+        :type goal_at_end: bool
+        :raise ValueError: If it is not possible to construct a valid world.
 
-        Args:
-            tunnel_length (int, optional): length of the tunnel. Defaults to 4.
-            length (int, optional): overall length of the corridor. Defaults to 8.
-            goal_at_end (bool, optional): either the goal is palced at the start (False) or end (True) of the tunnel. Defaults to True.
-
-        Raises:
-            ValueError: if lentgth < 2.
-
-        Returns:
-            World: a new world, i.e., a corridor containing tunnel.
+        :return: A corridor containing a tunnel.
+        :rtype: World
         """
         if length < 2:
             raise ValueError('length < 2')
@@ -407,14 +425,15 @@ class World():
     @staticmethod
     def simple_slalom(lentgth:int=8, nwalls:int=3):
         """
-        Returns a (three times length) World where immovable walls are randomly placed in the center.
+        Returns a (3 times length) world where immovable walls are randomly placed in the center.
 
-        Args:
-            lentgth (int, optional): ncols of the world. Defaults to 8.
-            nwalls (int, optional): number of randomly placed walls. Defaults to 3.
+        :param length: Optional length of the corridor.
+        :type length: int
+        :param nwalls: Optional randomly placed walls.
+        :type nwalls: int
 
-        Returns:
-            World: a (three times length) World
+        :return: A (3 times length) world where immovable walls are randomly placed in the center.
+        :rtype: World
         """
         possibilities = list(range((lentgth-1)//2))
         nwalls = min(len(possibilities), nwalls)
@@ -439,15 +458,16 @@ class World():
     @staticmethod
     def multi_slalom(lentgth:int=8, ngaps:int=3):
         """
-        Returns a (three times length) World where immovable walls are randomly placed in the center.
+        Returns a (3 times length) world where immovable walls are randomly placed in the center.
         In fact, the center is a wall with ngaps gaps.
 
-        Args:
-            lentgth (int, optional): number of columns of the world. Defaults to 8.
-            ngaps (int, optional): number of gaps within the wall. Defaults to 3.
+        :param length: Optional number of columns of the world.
+        :type length: int
+        :param ngaps: Optional number of gaps within the wall.
+        :type ngaps: int
 
-        Returns:
-            World: a (three times length) World where immovable walls are randomly placed in the center.
+        :return: A (3 times length) World where immovable walls are randomly placed in the center.
+        :rtype: World
         """
         top = [CellState.EMPTY for _ in range(lentgth)]
         center = [CellState.EMPTY] + [CellState.WALL for _ in range(lentgth-2)] + [CellState.EMPTY]
@@ -470,7 +490,14 @@ class World():
 
     @staticmethod
     def round_trip():
-        """Returns a non-randomized round trip world."""
+        """
+        Returns a (11 times 27) world full of walls where there is only one possible round trip to traverse.
+        The world contains some leafs to work with.
+        
+        :return: A (11 times 27) world full of walls where there is only one possible round trip to traverse.
+        :rtype: World
+        """
+        
         text = """###########################
 #GE--###-------####-------#
 #-##-----#####---L--#####-#
@@ -486,7 +513,14 @@ class World():
 
     @staticmethod
     def pacman():
-        """Returns a non-randomized world where the idea is that the robo follows the leafs."""
+        """
+        Returns a (11 times 27) world containing a path occupied by leafs.
+        The idea is that Robo should follow the leafs.
+        
+        :return: A (11 times 27) world containing a path occupied by leafs.
+        :rtype: World
+        """
+        
         text = """---------------------------
 -ELLLLL--------------------
 ------L--------------------
@@ -503,13 +537,13 @@ class World():
     @staticmethod
     def sorting(n:int=8):
         """
-        Returns a randomized world where each column represents a number in a list.
+        Returns a randomized (n times n+1) world where each column represents a number in a list.
 
-        Args:
-            n (int, optional): number of numbers to sort. Defaults to 8.
+        :param n: Optional Number of numbers to sort.
+        :type n: int
 
-        Returns:
-            World: a randomized world where each column represents a number in a list.
+        :return: A (n times n+1) world (corridor) containing stones.
+        :rtype: World
         """
         cells = [[CellState.LEAF for _ in range(random.randint(1,n))] for _ in range(n)]
         for row in cells:
@@ -519,7 +553,12 @@ class World():
 
     @staticmethod
     def game_of_life():
-        """Returns a non-randomized world where the idea is that robo plays the game of life."""
+        """
+        Returns a (10 times 9) world containing leafs forming a starting configuration for Conway's Game of Life.
+        
+        :return: A (10 times 9) world containing leafs forming a starting configuration for Conway's Game of Life.
+        :rtype: World
+        """
         text = """E---------
 ---L------
 --LL------
@@ -533,7 +572,14 @@ LLLLLLL---
 
     @staticmethod
     def leaf_cross(nleafs:int=0):
-        """Returns a non-randomized world where the idea is that robo inverts the leafs / empty cells."""
+        """
+        Returns a (9 times 9) world containing leafs forming a cross.
+        
+        :param nleafs: Optional number of leafs the roboter has in its initial state.
+        :type nleafs: int
+        :return: A (9 times 9) world containing leafs forming a cross.
+        :rtype: World
+        """
         text = """LL-----LL
 LLL---LLL
 -LLL-LLL-
@@ -561,17 +607,19 @@ LLG---ELL"""
         """
         Returns a complex, randomly generated (nrows times ncols) maze.
         It is guaranteed that there is a path from the roboter to its goal.
+        If robo_orientation is None, then it is choosen at random.
+        Robo as well as its goal is placed at random positions.
 
-        Args:
-            nrows (int, optional): number of rows of the maze.. Defaults to 10.
-            ncols (int, optional): number of columns of the maze.. Defaults to 10.
-            robo_direction (Orientation, optional): initial orientation of the roboter. Defaults to None.
+        :param nrows: Optional Number of rows of the world.
+        :type nrows: int
+        :param ncols: Optional Number of columns of the world
+        :type ncols: int
+        :param robo_direction: Optional starting orientation of the roboter.
+        :type robo_position: bool
+        :raises ValueError: if the maze is too small.
+        :return: A new completely empty world.
+        :rtype: World
 
-        Raises:
-            ValueError: if the maze is too small.
-
-        Returns:
-            World: a world, i.e., a complex, randomly generated (nrows times ncols) maze
         """
     
         if nrows + ncols < 2:
@@ -652,19 +700,35 @@ LLG---ELL"""
     @staticmethod
     def str_to_world(text: str, nleafs=0):
         """
-        Retunrs a world by parsing a string that represents the world.
+        Returns a world by parsing a string that represents the world.
         Single characters have the following semantic:
 
-        # -> (immovable) WALL
-        G -> Goal
-        N -> Roboter (headway==NORTH)
-        S -> Roboter (headway==SOUTH)
-        W -> Roboter (headway==WEST)
-        E -> Roboter (headway==EAST)
-        R -> Roboter (random headway)
-        O -> STONE
-        L -> LEAF
-        everything else -> EMPTY
+        #: (immovable) WALL
+        
+        G: Goal position
+        
+        N: Robo position (orientation==NORTH)
+        
+        S: Robo position (orientation==SOUTH)
+        
+        W: Robo position (orientation==WEST)
+        
+        E: Robo position (orientation==EAST)
+        
+        R: Robo position (random orientation)
+        
+        O: STONE
+        
+        L: LEAF
+        
+        Everything else: EMPTY
+        
+        :param text: Representation of the world.
+        :type text: str
+        :param nleafs: Optional number of leafs the roboter has in its initial state.
+        :type nleafs: int
+        :return: A world constructed from its string representation.
+        :rtype: World
         """
 
         cells = []
@@ -704,28 +768,25 @@ LLG---ELL"""
 
 class Grid():
     """
-    The world the roboter is exploring.
+    The grid the roboter is exploring.
+    The difference between a Grid and a World is that, Grid does not know Robo or the rules of the World.
+    Grid just helps accessing the state of each cell.
 
-    The world is the rectangular discrete grid of a cellular automaton.
-    A cell can be in one of six CellState: EMPTY (0), WALL (1, unmoveable), ROBO (2), STONE (3, moveable), GOAL (4), ROBO_AT_GOAL (5, ROBO & GOAL).
-
-    Attributes
-    ----------
-    cells: list
-        two dimensional list of CellState, that is, integers between 0 and 5
-    marks: list
-        tow dimensional list of bool, i.e., of marked cells
-    nrows: int
-        positve number of rows of the grid
-    ncols: int
-        positive number of columns of the grid
+    The grid similar to two-dimensional a cellular automaton.
+    A cell of the grid can be in one of four CellState: EMPTY, WALL, STONE, LEAF.
     """
 
     def __init__(self, cells:StateGrid, goal_position:D2DVector) -> None:
         """
         Initializes the (perceivable) grid of the robo world.
-
-        Par
+        
+        :param cells: Pure cell state data (i.e. the Grid's data without methods).
+        :type cells: Sequence[Sequence[CellState]]
+        :param goal_position: Immoveable goal position.
+        :type goal_position: D2DVector
+        
+        :rtype: Grid
+        :return: A new grid.
         """
 
         if len(cells) == 0 or len(cells[0]) == 0:
@@ -840,18 +901,7 @@ class Grid():
         self.marks[row][col] = True
 
     def _remove_leaf_at(self, row: int, col: int) -> CellState:
-        """Removes a leaf from the position (row, col) and returns CellState.LEAF.
-
-        Args:
-            row (int): row
-            col (int): column
-
-        Raises:
-            LeafMissingException: If there is no leaf at row `row` and column `col`
-
-        Returns:
-            CellState: CellState.LEAF
-        """
+        """Removes a leaf from the position (row, col) and returns CellState.LEAF."""
         if self._is_leaf_at(row, col):
             result = self._get_state(row, col)
             self._set_state(row, col, CellState.EMPTY)
@@ -884,24 +934,27 @@ class Robo():
     Robo can turn by 90 degree to the left.
     It can only analyse the cell directly in front, therefore, it has an orientation (headway).
     It can mark and unmark cells it occupies but can only spot marks in front.
-
-    Attributes (private)
-    ----------
-    world: World
-        The world of this roboter
-    position: list
-        The current row and column of the roboter
-    orientation:
-        The current orientation of the headway of the roboter (EAST, WEST, NORTH or SOUTH)
-    stone:
-        The current stone the roboter is carrying (if any)
-    marks: int
-        Number of marks the roboter has set and not unset
-    print_actions: bool
-        If print roboter actions if and only if print_actions==True
     """
 
     def __init__(self, position:D2DVector, grid: Grid, orientation: Orientation=Orientation.EAST, print_actions: bool=True, nleafs: int = 0) -> None:
+        """
+        Initializes a new Robo.
+        
+        :position nrows: Initial position of Robo.
+        :type position: D2DVector
+        :param grid: The grid Robo can sensor and manipulate.
+        :type grid: Grid
+        :param orientation: Optional initial orientation of the roboter of this world. Defaults to Orientation.EAST.
+        :type orientation: Orientation
+        :param print_actions: Optional If False there will be no printing of Robo's actions.
+        :type print_actions: bool
+        :param nleafs: Optional initial number of leafs of Robo.
+        :type nleafs: int
+        
+        :rtype: Robo
+        :return: A new Robo
+        """
+        
         self.grid : Grid = grid
         self.position : D2DVector = position
         self.orientation : Orientation = orientation
@@ -929,21 +982,22 @@ class Robo():
 
     # non-privates
     def is_stone_in_front(self) -> bool:
-        """Returns True if and only if there is a stone in front of robo."""
+        """
+        Returns True if and only if there is a stone in front of robo.
+        
+        :return: True if and only if there is a stone in front of robo.
+        :rtype: bool
+        """
         return self.__get_state_at(self.orientation) == CellState.STONE
 
     def take_stone_in_front(self) -> None:
         """
-        Takes a stone in front.
+        Takes a stone that is in front.
         
-        Raises
-        ------
-        SpaceIsFullException
-            If robo already carries a stone
-        WallInFrontException
-            If there is a wall in front, i.e., no stone
-        StoneMissingException
-            If there is no stone in front
+        :raises SpaceIsFullException: If Robo does already carry a stone.
+        :raises WallInFrontException: If there is a wall in front, i.e., no stone.
+        :raises LeafInFrontException: If there is a leaf in front.
+        :raises StoneMissingException: If there is no stone in front.
         """
         if self.stone != None:
             raise SpaceIsFullException()
@@ -961,16 +1015,10 @@ class Robo():
         """
         Puts the carrying stone down in front.
         
-        Raises
-        ------
-        SpaceIsEmptyException
-            If robo does not carry a stone
-        WallInFrontException
-            If there is a wall in front, i.e., no stone
-        StoneInFrontException
-            If there is another stone in front
-        LeafInFrontException
-            If there is a leaf in front the robo can not put the stone down
+        :raises SpaceIsEmptyException: If Robo does not carry a stone.
+        :raises WallInFrontException: If there is a wall in front, i.e., no stone.
+        :raises StoneInFrontException: If there is another stone in front.
+        :raises LeafInFrontException: If there is a leaf in front.
         """
         if not self.is_carrying_stone():
             raise SpaceIsEmptyException()
@@ -988,12 +1036,10 @@ class Robo():
 
     def put_leaf(self) -> None:
         """
-        Puts a leaf down at the current position.
+        Puts a leaf at Robo's current position.
         
-        Raises
-        ------
-        NoMoreLeafsException
-            If robo does not carry any more leafs
+        :raises NoMoreLeafsException: If Robo does not carry any leaf.
+        :raises CellOccupiedException: If there is an object (leaf, wall, stone) at the current cell.
         """
         if not self.is_carrying_leafs():
             raise NoMoreLeafsException()
@@ -1004,41 +1050,69 @@ class Robo():
         self.notify_recorders()
         
     def take_leaf(self) -> None:
+        """
+        Takes a leaf at Robo's current position.
+        
+        :raises LeafMissingException: If there is no leaf the Robo's position.
+        """
         self.grid._remove_leaf_at(*self.position)
         self.__print(f'take leaf at {self.position}')
         self.nleafs += 1
         self.notify_recorders()
 
     def is_carrying_leafs(self):
-        """Returns True if and only if thre the robo carries any leafs."""
+        """
+        Returns True if and only if thre the robo carries any leafs.
+        
+        :return: True if and only if thre the robo carries any leafs.
+        :rtype: bool
+        """
         return self.nleafs > 0
 
     def is_front_clear(self) -> bool:
-        """Returns True if and only if thre is no wall in front, i.e., no (immoveable) obstacle and not the boundary of the world."""
+        """
+        Returns True if and only if thre is no wall in front, i.e., no (immoveable) wall and not the boundary of the world.
+        
+        :return: True if and only if thre is no wall in front, i.e., no (immoveable) wall and not the boundary of the world.
+        :rtype: bool
+        """
         return not self.is_wall_in_front()
 
     def is_leaf_in_front(self) -> bool:
-        """Returns True if and only if there is a LEAF in front."""
+        """
+        Returns True if and only if thre is a leaf in front.
+        
+        :return: True if and only if thre is a leaf in front.
+        :rtype: bool
+        """
         return self.__get_state_at(self.orientation) == CellState.LEAF
 
     def is_mark_in_front(self) -> bool:
-        """Returns True if and only if there is a mark in front."""
+        """
+        Returns True if and only if there is a mark in front.
+        
+        :return: True if and only if there is a mark in front.
+        :rtype: bool
+        """
         return self.is_front_clear() and self.__is_mark_at(self.orientation)
 
     def is_wall_in_front(self) -> bool:
-        """Returns True if and only if there is an (immoveable) obstacle or the boundary of the world in front."""
+        """
+        Returns True if and only if there is an (immoveable) wall or the boundary of the world in front.
+        
+        :return: True if and only if there is an (immoveable) wall or the boundary of the world in front.
+        :rtype: bool
+        """
         return not self.__is_reachable(self.orientation)
 
     def move(self) -> D2DVector:
         """
-        Moves robo one cell ahead.
+        Moves Robo one cell ahead.
         
-        Raises
-        ------
-        WallInFrontException
-            If there is an (immoveable) wall in front (obstacle or boundary of the world)
-        StoneInFrontException
-            If there is an stone (moveable) in front
+        :raises WallInFrontException: If there is an (immoveable, not traverseable) wall in front (WALL or boundary of the world).
+        :raises StoneInFrontException: If there is a stone (moveable, not traverseable) in front.
+        :return: Robo's new position.
+        :rtype: D2DVector
         """
         before = self.position
         if self.is_wall_in_front():
@@ -1066,28 +1140,50 @@ class Robo():
         self.notify_recorders()
 
     def is_carrying_stone(self) -> bool:
-        """Returns True if and only if robo is carrying a stone."""
+        """
+        Returns True if and only if robo is carrying a stone.
+        
+        :return: True if and only if robo is carrying a stone.
+        :rtype: bool
+        """
         return self.stone != None
 
     def turn_left(self) -> None:
-        """Robo turns 90 degrees to the left."""
+        """
+        Robo turns 90 degrees to the left (counter-clockwise order NORTH->WEST->SOUTH->EAST).
+        """
         before = self.orientation
         self.orientation = self.orientation.next()
         self.__print(f'turn {before} -> {self.orientation}')
         self.notify_recorders()
 
     def is_facing_north(self) -> bool:
-        """Returns True if and only if robo is oriented towords the north."""
+        """
+        Returns True if and only if robo is oriented towords the north.
+        
+        :return: True if and only if robo is oriented towords the north.
+        :rtype: bool
+        """
         return self.orientation == Orientation.NORTH
 
     def toss(self) -> bool:
-        """Returns randomly True or False."""
+        """
+        Returns randomly True or False.
+        
+        :return: Either True or False by chance 50/50.
+        :rtype: bool
+        """
         toss = random.randint(0, 1) == 1
         self.__print(f'toss {toss}')
         return toss
 
     def is_at_goal(self):
-        """Returns True if and only if robo is standing at the goal."""
+        """
+        Returns True if and only if robo is standing at the goal.
+        
+        :return: True if and only if robo is standing at the goal.
+        :rtype: bool
+        """
         return self.grid._is_goal_at(self.position[0], self.position[1])
 
     ## protected methods
@@ -1136,7 +1232,7 @@ class Robo():
         else:
             return y-1 >= 0 and self.grid._get_state(y-1, x) != CellState.WALL
 
-    def __front(self) -> tuple[int, int]:
+    def __front(self) -> D2DVector:
         return self.position + self.orientation.value
 
     def __back(self):
