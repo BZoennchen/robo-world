@@ -5,12 +5,12 @@ packages = \
     ['roboworld']
 
 install_requires = \
-    ['matplotlib>=3.2.1,<4.0.0', 'rich>=3.3.1,<4.0.0']
+    ['matplotlib', 'numpy']
 
 package_data = \
     {'': ['*']}
 
-keywords = ['education', 'cellular automaton', 'roboter', 'learning', 'beginners', 'computational thinking']
+keywords = ['education', 'gamification', 'cellular automaton', 'roboter', 'learning', 'beginners', 'computational thinking']
 
 #long_description=long_description,
 #long_description_content_type='text/x-rst',

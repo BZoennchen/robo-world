@@ -1,6 +1,14 @@
 # mac os
 *.DS_Store
 
+# VSCode
+*.vscode
+
+# sphinx
+_build/
+_template/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
