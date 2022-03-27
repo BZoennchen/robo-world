@@ -33,6 +33,8 @@ The goal is positioned at the **purple** cell.
 
 Cells in the state LEAF and EMPTY are **traversable** while cells in the state STONE or WALL can not be occubied by ``Robo``.
 
+We use the matrix-like indexing that starts from ``0``, i.e. row before column, such that ``cell[1][2]`` is the cell in the **second row** and the **third column**.
+
 Display the World
 ~~~~~~~~~~~~~~~~~~~~
 
