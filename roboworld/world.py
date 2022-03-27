@@ -954,7 +954,7 @@ class Robo():
         if not self.is_stone_in_front():
             raise StoneMissingException()
         self.stone = self.grid._remove_stone_at(*self.__front())
-        self.__print(f'takes {self.stone}')
+        self.__print(f'take stone at {self.__front()}')
         self.notify_recorders()
 
     def put_stone_in_front(self) -> None:
@@ -982,7 +982,7 @@ class Robo():
             raise LeafInFrontException()
 
         self.grid._set_stone_at(*self.__front())
-        self.__print(f'puts {self.stone}')
+        self.__print(f'put stone at {self.__front()}')
         self.stone = None
         self.notify_recorders()
 
@@ -999,13 +999,13 @@ class Robo():
             raise NoMoreLeafsException()
 
         self.grid._set_leaf_at(*self.position)
-        self.__print(f'puts leaf at {self.position}')
+        self.__print(f'put leaf at {self.__front()}')
         self.nleafs -= 1
         self.notify_recorders()
         
     def take_leaf(self) -> None:
         self.grid._remove_leaf_at(*self.position)
-        self.__print(f'takes leaf at {self.position}')
+        self.__print(f'take leaf at {self.position}')
         self.nleafs += 1
         self.notify_recorders()
 
@@ -1049,20 +1049,20 @@ class Robo():
         #self._world._move_robo(before, self._position)
 
         #self._world._push()
-        self.__print(f'move ({before[1]},{before[0]}) -> ({self.position[1]},{self.position[0]})')
+        self.__print(f'move {before} -> {self.position}')
         self.notify_recorders()
         return self.position
 
     def set_mark(self) -> None:
         """Marks the current cell, i.e., position."""
         self.grid._set_mark_at(*self.position)
-        self.__print(f'mark ({self.position[1]},{self.position[0]})')
+        self.__print(f'mark {self.position}')
         self.notify_recorders()
 
     def unset_mark(self) -> None:
         """Unmarks the current cell, i.e., position."""
         self.grid._unset_mark_at(self.position[0], self.position[1])
-        self.__print(f'remove mark ({self.position[1]},{self.position[0]})')
+        self.__print(f'remove mark at {self.position}')
         self.notify_recorders()
 
     def is_carrying_stone(self) -> bool:
