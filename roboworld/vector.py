@@ -12,6 +12,12 @@ class D2DVector:
             return self.vec == other.vec
         else:
             return False
+    
+    def to_tuple(self):
+        return self.vec
+    
+    def to_list(self):
+        return list(self.vec)
 
     def __add__(self, other):
         return D2DVector(self[0] + other[0], self[1] + other[1])

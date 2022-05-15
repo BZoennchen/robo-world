@@ -138,7 +138,7 @@ class World():
         
         :raise InvalidWorldArgumentsExeception: If the predefined grid does not match with nrows and ncols or any position is outside of the grid.
         """
-
+            
         # generate empty grid if cell is undefined
         if cells == None:
             cells = [[CellState.EMPTY for _ in range(ncols)] for _ in range(nrows)]
@@ -166,6 +166,18 @@ class World():
         # determine the robo position if it is undefined
         if robo_initial_position == None:
             robo_initial_position = D2DVector(nrows // 2, ncols // 2)
+            
+        if type(robo_initial_position) is not D2DVector:
+            if isinstance(robo_initial_position, (list, tuple)):
+                robo_initial_position = D2DVector(*robo_initial_position)
+            else:
+                raise InvalidWorldArgumentsExeception(f'Robo\'s initial position is invalid: {robo_initial_position}')
+            
+        if type(goal_position) is not D2DVector:
+            if isinstance(goal_position, (list, tuple)):
+                goal_position = D2DVector(*goal_position)
+            else:
+                raise InvalidWorldArgumentsExeception(f'Robo\'s goal is invalid: {robo_initial_position}')
         
         if self._grid._is_wall_at(*robo_initial_position):
             raise InvalidWorldArgumentsExeception(f'Robo position {robo_initial_position} is outside of the ({self._grid.nrows} times {self._grid.ncols}) grid / world.') 

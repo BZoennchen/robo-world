@@ -34,13 +34,13 @@ By this process they learn
 3. to recoginze pattern, and 
 4. to design and implement algorithms.
 
-Documentation can be found [here](https://robo-world-doc.readthedocs.io/en/latest/index.html).
+Documentation can be found here: https://robo-world-doc.readthedocs.io/en/latest/index.html
 """
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.1.3',
-    'description': 'Educational roboter world for learning the basic programming concepts.',
+    'version': '0.1.4',
+    'description': 'Educational roboter world to learn basic programming concepts.',
     'long_description': long_description,
     'author': 'Benedikt Zoennchen',
     'author_email': 'benedikt.zoennchen@web.de',
