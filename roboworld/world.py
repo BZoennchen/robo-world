@@ -145,6 +145,16 @@ class World():
         elif len(cells) != nrows or (len(cells) < 0 or len(cells[0]) != ncols):
             raise InvalidWorldArgumentsExeception(f'Invalid grid dimensions.') 
 
+        # determine the robo position if it is undefined
+        if robo_initial_position == None:
+            robo_initial_position = D2DVector(nrows // 2, ncols // 2)
+            
+        if type(robo_initial_position) is not D2DVector:
+            if isinstance(robo_initial_position, (list, tuple)):
+                robo_initial_position = D2DVector(*robo_initial_position)
+            else:
+                raise InvalidWorldArgumentsExeception(f'Robo\'s initial position is invalid: {robo_initial_position}')
+
         # determine the goal position if it is undefined
         if goal_position == None:
             # determine all possible positions
@@ -162,16 +172,6 @@ class World():
             goal_position = possibilities[random.randint(0, len(possibilities)-1)]
                    
         self._grid : Grid = Grid(cells, goal_position)
-
-        # determine the robo position if it is undefined
-        if robo_initial_position == None:
-            robo_initial_position = D2DVector(nrows // 2, ncols // 2)
-            
-        if type(robo_initial_position) is not D2DVector:
-            if isinstance(robo_initial_position, (list, tuple)):
-                robo_initial_position = D2DVector(*robo_initial_position)
-            else:
-                raise InvalidWorldArgumentsExeception(f'Robo\'s initial position is invalid: {robo_initial_position}')
             
         if type(goal_position) is not D2DVector:
             if isinstance(goal_position, (list, tuple)):

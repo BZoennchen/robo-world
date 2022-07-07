@@ -39,7 +39,7 @@ Documentation can be found here: https://robo-world-doc.readthedocs.io/en/latest
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.1.4',
+    'version': '0.1.5',
     'description': 'Educational roboter world to learn basic programming concepts.',
     'long_description': long_description,
     'author': 'Benedikt Zoennchen',
