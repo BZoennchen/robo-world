@@ -43,6 +43,7 @@ setup_kwargs = {
     'version': '0.1.6',
     'description': 'Educational roboter world to learn basic programming concepts.',
     'long_description': long_description,
+    'long_description_content_type': 'text/markdown',
     'author': 'Benedikt Zoennchen',
     'author_email': 'benedikt.zoennchen@web.de',
     'maintainer': 'BZoennchen',
