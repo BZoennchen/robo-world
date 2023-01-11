@@ -40,7 +40,7 @@ The documentation can be found here: https://robo-world-doc.readthedocs.io/en/la
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.1.6',
+    'version': '0.1.7',
     'description': 'Educational roboter world to learn basic programming concepts.',
     'long_description': long_description,
     'long_description_content_type': 'text/markdown',
