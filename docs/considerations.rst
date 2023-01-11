@@ -1,10 +1,10 @@
 Disable the expensive Visualization
 ================================================
 
-If students solve more complex problems they will eventually move ``Robo`` alot.
-To animate the actions of ``Robo`` we basically copy the whole world in its current state.
-This can lead to large memory requirements and can drastically influence computation times.
-Therefore it is recommended to deactive the recording of the actions and/or the printing of each action.
+If students solve complex problems, they will eventually move ``Robo``a lot.
+To animate the actions of ``Robo`` we copy the whole world in its current state.
+This can lead to significant memory requirements and can drastically influence computation times.
+Therefore, deactivating the recording of the actions and/or the printing of each action is recommended.
 
 
 Control the Printing

@@ -95,6 +95,17 @@ class TestTakeLeafs(unittest.TestCase):
         
         with self.assertRaises(CellOccupiedException):
             robo.put_leaf()
+
+class TestIsInFrontEndOfWorld(unittest.TestCase):
+    def test(self):
+        _, robo = create_empty_corridor()
+        for _ in range(5):
+            robo.move()
+        self.assertTrue(robo.is_at_goal())
+        self.assertFalse(robo.is_leaf_in_front())
+        self.assertFalse(robo.is_stone_in_front())
+        self.assertFalse(robo.is_mark_in_front())
+        self.assertTrue(robo.is_wall_in_front())
         
 
 class TestTakeStone(unittest.TestCase):

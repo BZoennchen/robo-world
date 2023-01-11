@@ -16,30 +16,31 @@ keywords = ['education', 'gamification', 'cellular automaton', 'roboter', 'learn
 #long_description_content_type='text/x-rst',
 
 long_description="""
-``roboworld`` is an educational ``Python``-package designed for students to learn basic programming concepts, such as,
+``roboworld`` is an educational ``Python`` package designed for students to learn basic programming concepts, such as,
 
 + variables,
 + function calls,
-+ conditionals, 
++ conditionals,
 + loops and
 + recursion.
 
-Students have to navigate ``Robo`` (a roboter) through different two-dimensional discrete ``Worlds``.
-``Robo`` represents a very simplistic machine that can only deal with very basic instructions, i.e., method calls.
+Students must navigate ``Robo`` (a robot) through different two-dimensional discrete ``Worlds``.
+``Robo`` represents a very simplistic machine that can only deal with elementary instructions, i.e., method calls.
 Therefore, students have to extend the missing functionality step by step.
-By this process they learn
+Through this process they learn
 
-1. to divde a problem into smaller pieces,
+1. to divide a problem into smaller pieces,
 2. to abstract,
-3. to recoginze pattern, and 
+3. to recognize patterns, and
 4. to design and implement algorithms.
 
-Documentation can be found here: https://robo-world-doc.readthedocs.io/en/latest/index.html
+
+The documentation can be found here: https://robo-world-doc.readthedocs.io/en/latest/index.html
 """
 
 setup_kwargs = {
     'name': 'roboworld',
-    'version': '0.1.5',
+    'version': '0.1.6',
     'description': 'Educational roboter world to learn basic programming concepts.',
     'long_description': long_description,
     'author': 'Benedikt Zoennchen',
