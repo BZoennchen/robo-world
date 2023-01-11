@@ -1000,7 +1000,7 @@ class Robo():
         :return: True if and only if there is a stone in front of robo.
         :rtype: bool
         """
-        return self.__get_state_at(self.orientation) == CellState.STONE
+        return self.is_front_clear() and self.__get_state_at(self.orientation) == CellState.STONE
 
     def take_stone_in_front(self) -> None:
         """
@@ -1097,7 +1097,7 @@ class Robo():
         :return: True if and only if thre is a leaf in front.
         :rtype: bool
         """
-        return self.__get_state_at(self.orientation) == CellState.LEAF
+        return self.is_front_clear() and self.__get_state_at(self.orientation) == CellState.LEAF
 
     def is_mark_in_front(self) -> bool:
         """
